@@ -31,18 +31,19 @@ RUN npm run build
 # ==========================================
 FROM alpine:3.21 AS trivy-builder
 WORKDIR /tmp
+ARG TARGETARCH
 
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache curl git ca-certificates \
     && mkdir -p /usr/local/bin /root/.trivy \
-    && ARCH=$(uname -m) \
-    && if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
+    && if [ "$TARGETARCH" = "arm64" ] || [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
     && TRIVY_VERSION="0.74.0" \
     && curl -fSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" -o trivy.tar.gz \
     && tar -xzf trivy.tar.gz -C /usr/local/bin trivy \
     && chmod +x /usr/local/bin/trivy \
     && rm -f trivy.tar.gz \
     && trivy plugin install github.com/cfculhane/trivy-plugin-teamcity-report || true
+
 
 # ==========================================
 # Stage 4: Lean Production Runtime (Hardened & Upgraded)
