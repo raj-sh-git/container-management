@@ -61,19 +61,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Top Banner / Welcome */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Infrastructure Dashboard</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+            Infrastructure Dashboard
+          </h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Real-time status of host daemon, containers, images, storage, and Trivy security
           </p>
         </div>
 
         {/* Quick Action Buttons */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <button
             onClick={onOpenScanModal}
-            className="flex items-center space-x-2 px-3.5 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold transition-all shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3 sm:px-3.5 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold transition-all shadow-sm"
           >
             <ShieldAlert className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
             <span>Trivy Scan</span>
@@ -81,7 +83,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           <button
             onClick={onOpenCreateContainer}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition-all"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3.5 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Deploy Container</span>
@@ -90,7 +92,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       </div>
 
       {/* Metric Counters Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Containers Tile */}
         <div
           onClick={() => onSelectTab('containers')}
@@ -175,31 +177,31 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
       {/* Host Specs & Daemon Details */}
       {systemInfo && (
-        <div className="p-6 bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-4 mb-4">
-            <div className="flex items-center space-x-3">
-              <Server className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Host Engine Telemetry</h3>
+        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+          <div className="flex flex-wrap items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-3 sm:pb-4 mb-4 gap-2">
+            <div className="flex items-center space-x-2.5 sm:space-x-3">
+              <Server className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 dark:text-blue-400 shrink-0" />
+              <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Host Engine Telemetry</h3>
             </div>
             <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">Docker {systemInfo.ServerVersion}</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs">
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 rounded-xl border border-zinc-200 dark:border-zinc-800/60">
               <span className="text-zinc-500 font-medium">Operating System</span>
-              <div className="text-zinc-800 dark:text-zinc-200 font-semibold mt-0.5">{systemInfo.OperatingSystem}</div>
+              <div className="text-zinc-800 dark:text-zinc-200 font-semibold mt-0.5 truncate" title={systemInfo.OperatingSystem}>{systemInfo.OperatingSystem}</div>
             </div>
-            <div>
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 rounded-xl border border-zinc-200 dark:border-zinc-800/60">
               <span className="text-zinc-500 font-medium">Architecture / CPUs</span>
               <div className="text-zinc-800 dark:text-zinc-200 font-semibold mt-0.5">
                 {systemInfo.Architecture} ({systemInfo.NCPU} Cores)
               </div>
             </div>
-            <div>
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 rounded-xl border border-zinc-200 dark:border-zinc-800/60">
               <span className="text-zinc-500 font-medium">Total Host RAM</span>
               <div className="text-zinc-800 dark:text-zinc-200 font-semibold mt-0.5">{formatBytes(systemInfo.MemTotal)}</div>
             </div>
-            <div>
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 rounded-xl border border-zinc-200 dark:border-zinc-800/60">
               <span className="text-zinc-500 font-medium">Storage Driver</span>
               <div className="text-zinc-800 dark:text-zinc-200 font-semibold mt-0.5">{systemInfo.Driver}</div>
             </div>
@@ -208,7 +210,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       )}
 
       {/* Active Running Containers Table */}
-      <div className="p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm dark:shadow-xl space-y-4">
+      <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm dark:shadow-xl space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Activity className="w-4 h-4 text-emerald-500" />

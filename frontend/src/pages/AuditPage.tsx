@@ -119,7 +119,7 @@ export const AuditPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative w-72">
+        <div className="relative w-full sm:w-72">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"

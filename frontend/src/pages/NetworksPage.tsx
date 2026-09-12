@@ -74,13 +74,13 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Virtual Networks</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Virtual Networks</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Manage subnets, bridge/overlay drivers & container connections</p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <button
             onClick={onRefresh}
             className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl"
@@ -92,7 +92,7 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
           {isOperator && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
+              className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create Network</span>
@@ -101,12 +101,12 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
         </div>
       </div>
 
-      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between transition-colors shadow-sm">
+      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors shadow-sm">
         <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
           Showing {filtered.length} of {networks.length} Networks
         </div>
 
-        <div className="relative w-72">
+        <div className="relative w-full sm:w-72">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -119,16 +119,17 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
       </div>
 
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-xl transition-colors">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
-            <tr>
-              <th className="py-3 px-4">Network Name</th>
-              <th className="py-3 px-4">Driver</th>
-              <th className="py-3 px-4">Subnet / Gateway</th>
-              <th className="py-3 px-4">Connected Containers</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
+              <tr>
+                <th className="py-3 px-4">Network Name</th>
+                <th className="py-3 px-4">Driver</th>
+                <th className="py-3 px-4">Subnet / Gateway</th>
+                <th className="py-3 px-4">Connected Containers</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
             {filtered.length === 0 ? (
               <tr>
@@ -217,6 +218,7 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Connect Modal */}

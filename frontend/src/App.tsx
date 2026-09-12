@@ -40,6 +40,7 @@ import {
 const AppContent: React.FC = () => {
   const { user, loading: authLoading, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Core Docker data state
   const [containers, setContainers] = useState<Container[]>([]);
@@ -96,10 +97,10 @@ const AppContent: React.FC = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center text-zinc-600 dark:text-zinc-400">
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center text-zinc-600 dark:text-zinc-400 p-4">
         <div className="flex flex-col items-center space-y-3">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-mono">Initializing Container Control Center Session...</p>
+          <p className="text-xs font-mono text-center">Initializing Container Control Center Session...</p>
         </div>
       </div>
     );
@@ -113,6 +114,7 @@ const AppContent: React.FC = () => {
     setSelectedContainerForDetail(c);
     setInitialDetailTab(tab || 'overview');
     setActiveTab('containers');
+    setIsMobileMenuOpen(false);
   };
 
   const handleOpenScanWithTarget = (target: {
@@ -126,14 +128,21 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-200">
-      <Navbar onRefresh={fetchAllData} />
+      <Navbar
+        onRefresh={fetchAllData}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      />
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 relative">
         <Sidebar
           activeTab={activeTab}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
           onSelectTab={(t) => {
             if (t !== 'containers') setSelectedContainerForDetail(null);
             setActiveTab(t);
+            setIsMobileMenuOpen(false);
           }}
           counts={{
             containers: containers.length,
@@ -145,7 +154,7 @@ const AppContent: React.FC = () => {
           }}
         />
 
-        <main className="flex-1 p-8 max-w-7xl mx-auto w-full overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto min-w-0">
           {activeTab === 'dashboard' && (
             <DashboardPage
               systemInfo={systemInfo}
@@ -154,7 +163,10 @@ const AppContent: React.FC = () => {
               volumes={volumes}
               networks={networks}
               reports={reports}
-              onSelectTab={setActiveTab}
+              onSelectTab={(t) => {
+                setActiveTab(t);
+                setIsMobileMenuOpen(false);
+              }}
               onOpenCreateContainer={() => setIsCreateContainerOpen(true)}
               onOpenScanModal={() => {
                 setScanModalTarget(undefined);

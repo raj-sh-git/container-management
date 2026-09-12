@@ -160,22 +160,22 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ reportId, onClose, o
   return (
     <div className="space-y-6">
       {/* Header Info Banner */}
-      <div className="p-6 bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
+      <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 dark:text-blue-400 border border-blue-500/20">
               <ShieldAlert className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight">
                   Trivy Scan: {report.targetName}
                 </h3>
                 <span className="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 uppercase font-mono font-medium">
                   {report.targetType}
                 </span>
               </div>
-              <div className="flex items-center space-x-3 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 <span className="flex items-center space-x-1">
                   <Clock className="w-3.5 h-3.5" />
                   <span>{new Date(report.createdAt).toLocaleString()}</span>
@@ -237,10 +237,10 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ reportId, onClose, o
       </div>
 
       {/* Interactive Vulnerability Table */}
-      <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4 shadow-xl">
+      <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 space-y-4 shadow-xl">
           {/* Filters Bar */}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((sev) => (
                 <button
                   key={sev}
@@ -256,7 +256,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ reportId, onClose, o
               ))}
             </div>
 
-            <div className="relative w-72">
+            <div className="relative w-full sm:w-72">
               <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"

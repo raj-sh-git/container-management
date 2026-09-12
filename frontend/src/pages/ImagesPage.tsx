@@ -188,15 +188,15 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Image Registry</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Image Registry</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Manage local images, pull from public / private registries, tag & inspect layers
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <button
             onClick={onRefresh}
             className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
@@ -208,7 +208,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           {isOperator && (
             <button
               onClick={() => setIsPullModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
+              className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
             >
               <DownloadCloud className="w-4 h-4" />
               <span>Pull Image</span>
@@ -218,11 +218,11 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center space-x-2">
+      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               statusFilter === 'all'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                 : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -232,7 +232,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           </button>
           <button
             onClick={() => setStatusFilter('in-use')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               statusFilter === 'in-use'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                 : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -242,7 +242,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           </button>
           <button
             onClick={() => setStatusFilter('unused')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               statusFilter === 'unused'
                 ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
                 : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -252,7 +252,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           </button>
         </div>
 
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"

@@ -52,14 +52,14 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-2xl border border-blue-500/20">
-              <ShieldAlert className="w-6 h-6" />
+            <div className="p-2.5 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-2xl border border-blue-500/20 shrink-0">
+              <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Trivy Vulnerability Center</h1>
+              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Trivy Vulnerability Center</h1>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Comprehensive security vulnerability and configuration scanning powered by Trivy engine
               </p>
@@ -67,7 +67,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <button
             onClick={onRefresh}
             className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
@@ -79,7 +79,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
           {isOperator && (
             <button
               onClick={onOpenScanModal}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
+              className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
             >
               <Play className="w-4 h-4" />
               <span>Launch Scan</span>
@@ -89,26 +89,26 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
       </div>
 
       {/* Security Overview Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-4 bg-white dark:bg-zinc-900/80 border border-red-500/20 rounded-2xl shadow-sm">
-          <div className="text-2xl font-black text-red-500 dark:text-red-400">{totalCritical}</div>
-          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Critical CVEs</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-zinc-900/80 border border-red-500/20 rounded-2xl shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-red-500 dark:text-red-400">{totalCritical}</div>
+          <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Critical CVEs</div>
         </div>
-        <div className="p-4 bg-white dark:bg-zinc-900/80 border border-orange-500/20 rounded-2xl shadow-sm">
-          <div className="text-2xl font-black text-orange-500 dark:text-orange-400">{totalHigh}</div>
-          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">High CVEs</div>
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-zinc-900/80 border border-orange-500/20 rounded-2xl shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-orange-500 dark:text-orange-400">{totalHigh}</div>
+          <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">High CVEs</div>
         </div>
-        <div className="p-4 bg-white dark:bg-zinc-900/80 border border-yellow-500/20 rounded-2xl shadow-sm">
-          <div className="text-2xl font-black text-yellow-600 dark:text-yellow-400">{totalMedium}</div>
-          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Medium CVEs</div>
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-zinc-900/80 border border-yellow-500/20 rounded-2xl shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-yellow-600 dark:text-yellow-400">{totalMedium}</div>
+          <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Medium CVEs</div>
         </div>
-        <div className="p-4 bg-white dark:bg-zinc-900/80 border border-blue-500/20 rounded-2xl shadow-sm">
-          <div className="text-2xl font-black text-blue-500 dark:text-blue-400">{totalLow}</div>
-          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Low CVEs</div>
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-zinc-900/80 border border-blue-500/20 rounded-2xl shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-blue-500 dark:text-blue-400">{totalLow}</div>
+          <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Low CVEs</div>
         </div>
-        <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm">
-          <div className="text-2xl font-black text-zinc-900 dark:text-zinc-100">{reports.length}</div>
-          <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Total Scans</div>
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm col-span-2 sm:col-span-1">
+          <div className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-zinc-100">{reports.length}</div>
+          <div className="text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1">Total Scans</div>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
             onClick={() => setSelectedReportId(null)}
             className="text-xs font-semibold text-blue-500 hover:text-blue-400 flex items-center space-x-1"
           >
-            <span>← Back to all reports</span>
+            <span>&larr; Back to Scan Reports List</span>
           </button>
           <ReportViewer
             reportId={selectedReportId}
@@ -132,12 +132,12 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between transition-colors">
+          <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
             <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               Historical Scan Reports ({filtered.length})
             </div>
 
-            <div className="relative w-72">
+            <div className="relative w-full sm:w-72">
               <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"

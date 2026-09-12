@@ -160,10 +160,10 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Host Daemon & Disk Engine</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Host Daemon & Disk Engine</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Host specifications, storage utilization, automated cleanup scheduler & garbage collection
           </p>
@@ -175,7 +175,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
             loadSchedules();
             onRefresh();
           }}
-          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
+          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors self-start sm:self-auto"
           title="Refresh host metrics"
         >
           <RefreshCw className="w-4 h-4" />
@@ -184,18 +184,18 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
 
       {/* Host Engine Specs Grid */}
       {systemInfo && (
-        <div className="p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex items-center space-x-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
-            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
+        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
+          <div className="flex items-center space-x-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-3 sm:pb-4">
+            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
               <Server className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Docker Daemon Specifications</h3>
+              <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Docker Daemon Specifications</h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Node Architecture & Engine Runtime</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs font-mono">
             <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 rounded-xl border border-zinc-200 dark:border-zinc-800/60">
               <span className="text-zinc-500 text-[10px] uppercase font-sans font-bold">Engine Version</span>
               <div className="text-zinc-900 dark:text-zinc-200 font-bold mt-1 text-sm">{systemInfo.ServerVersion}</div>
@@ -220,7 +220,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
 
       {/* Disk Space Breakdown (docker system df) */}
       {diskUsage && (
-        <div className="p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
+        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/20">
@@ -287,14 +287,14 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
 
       {/* Auto Clean-Up Schedules Section (Admin only) */}
       {isAdmin && (
-        <div className="p-6 bg-white dark:bg-zinc-900/80 border border-indigo-500/20 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
+        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-indigo-500/20 rounded-2xl shadow-xl space-y-4 transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800/80 pb-3 sm:pb-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+              <div className="p-2 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl border border-indigo-500/20 shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Automated Clean-Up Scheduler</h3>
+                <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Automated Clean-Up Scheduler</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   Configure recurring or one-time automated garbage collection tasks for Docker resources
                 </p>
@@ -303,7 +303,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
 
             <button
               onClick={openCreateModal}
-              className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all"
+              className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all self-start sm:self-auto shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Add Clean-Up Schedule</span>

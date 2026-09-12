@@ -117,16 +117,16 @@ export const StacksPage: React.FC<StacksPageProps> = ({
                 className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-lg transition-colors"
               >
                 {/* Stack Header Bar */}
-                <div className="p-5 flex flex-wrap items-center justify-between gap-4 bg-zinc-50/70 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
+                <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 bg-zinc-50/70 dark:bg-zinc-950/40 border-b border-zinc-200 dark:border-zinc-800">
                   <div
                     onClick={() => toggleStack(stack.name)}
-                    className="flex items-center space-x-3 cursor-pointer select-none"
+                    className="flex items-center space-x-3 cursor-pointer select-none min-w-0"
                   >
-                    <button className="p-1 text-zinc-400 hover:text-zinc-200">
+                    <button className="p-1 text-zinc-400 hover:text-zinc-200 shrink-0">
                       {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
-                    <div>
-                      <div className="flex items-center space-x-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-base text-zinc-900 dark:text-white font-sans">
                           {stack.name}
                         </span>
@@ -141,7 +141,7 @@ export const StacksPage: React.FC<StacksPageProps> = ({
                         )}
                       </div>
                       {stack.workingDir && (
-                        <div className="text-[11px] text-zinc-500 font-mono mt-0.5 truncate max-w-lg">
+                        <div className="text-[11px] text-zinc-500 font-mono mt-0.5 truncate max-w-xs sm:max-w-lg">
                           Path: {stack.workingDir}
                         </div>
                       )}
@@ -157,7 +157,7 @@ export const StacksPage: React.FC<StacksPageProps> = ({
                       </span>
                     </div>
                   ) : isOperator ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => handleStackAction('start', stack.name)}
                         disabled={actionLoading === `start-${stack.name}`}

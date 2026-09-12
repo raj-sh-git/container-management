@@ -240,13 +240,13 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
       </div>
 
       {/* Filters and Batch Actions Header */}
-      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-wrap items-center justify-between gap-4 transition-colors">
-        <div className="flex items-center space-x-2">
+      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
+        <div className="flex flex-wrap items-center gap-2">
           {/* State Filters */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto max-w-full">
             <button
               onClick={() => setFilterState('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                 filterState === 'all'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -256,7 +256,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
             </button>
             <button
               onClick={() => setFilterState('running')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                 filterState === 'running'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -266,7 +266,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
             </button>
             <button
               onClick={() => setFilterState('stopped')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                 filterState === 'stopped'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -278,7 +278,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
 
           {/* Batch Actions */}
           {isOperator && selectedIds.length > 0 && (
-            <div className="flex items-center space-x-1.5 pl-3 border-l border-zinc-200 dark:border-zinc-800">
+            <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-3 sm:border-l border-zinc-200 dark:border-zinc-800 mt-2 sm:mt-0">
               <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold mr-1">
                 {selectedIds.length} Selected:
               </span>
@@ -311,7 +311,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
         </div>
 
         {/* Search */}
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -623,93 +623,108 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
 
       {/* Container Details Modal / Tabbed Drawer */}
       {activeContainer && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-5xl w-full h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-5xl w-full h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
-                  <Box className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">{activeContainer.name}</h2>
-                    {activeContainer.isSelf && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1">
-                        <ShieldCheck className="w-3 h-3" />
-                        <span>Self</span>
-                      </span>
-                    )}
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
-                      {activeContainer.state}
-                    </span>
+            <div className="p-4 sm:px-6 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-center justify-between w-full lg:w-auto">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                    <Box className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate max-w-md">{activeContainer.image}</p>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight truncate max-w-[170px] xs:max-w-[220px] sm:max-w-md">
+                        {activeContainer.name}
+                      </h2>
+                      {activeContainer.isSelf && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>Self</span>
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
+                        {activeContainer.state}
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate max-w-xs sm:max-w-md">{activeContainer.image}</p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Tabs Switcher */}
-              <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold">
                 <button
-                  onClick={() => setDetailTab('overview')}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    detailTab === 'overview' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
+                  onClick={() => setActiveContainer(null)}
+                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg lg:hidden"
+                  aria-label="Close modal"
                 >
-                  Overview
-                </button>
-                {activeContainer.state === 'running' && isOperator && (
-                  <button
-                    onClick={() => setDetailTab('terminal')}
-                    className={`px-3 py-1.5 rounded-lg transition-all ${
-                      detailTab === 'terminal' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Terminal
-                  </button>
-                )}
-                <button
-                  onClick={() => setDetailTab('logs')}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    detailTab === 'logs' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
-                >
-                  Logs
-                </button>
-                {activeContainer.state === 'running' && (
-                  <button
-                    onClick={() => setDetailTab('stats')}
-                    className={`px-3 py-1.5 rounded-lg transition-all ${
-                      detailTab === 'stats' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                    }`}
-                  >
-                    Metrics
-                  </button>
-                )}
-                <button
-                  onClick={() => openInspect(activeContainer)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    detailTab === 'inspect' ? 'bg-blue-600 text-white' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
-                >
-                  Inspect JSON
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <button
-                onClick={() => setActiveContainer(null)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              {/* Tabs Switcher & Close button */}
+              <div className="flex items-center justify-between lg:justify-end space-x-2 w-full lg:w-auto">
+                <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold overflow-x-auto max-w-full">
+                  <button
+                    onClick={() => setDetailTab('overview')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                      detailTab === 'overview' ? 'bg-blue-600 text-white shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Overview
+                  </button>
+                  {activeContainer.state === 'running' && isOperator && (
+                    <button
+                      onClick={() => setDetailTab('terminal')}
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                        detailTab === 'terminal' ? 'bg-blue-600 text-white shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Terminal
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setDetailTab('logs')}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                      detailTab === 'logs' ? 'bg-blue-600 text-white shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Logs
+                  </button>
+                  {activeContainer.state === 'running' && (
+                    <button
+                      onClick={() => setDetailTab('stats')}
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                        detailTab === 'stats' ? 'bg-blue-600 text-white shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Metrics
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openInspect(activeContainer)}
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                      detailTab === 'inspect' ? 'bg-blue-600 text-white shadow' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Inspect
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setActiveContainer(null)}
+                  className="hidden lg:block text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                  aria-label="Close modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Tab Content */}
-            <div className="p-6 flex-1 overflow-y-auto">
+            <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
               {detailTab === 'overview' && (
                 <div className="space-y-6 text-xs">
                   {/* Basic Metadata */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-zinc-50/80 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-4 bg-zinc-50/80 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
                     <div>
                       <span className="text-zinc-500 font-semibold uppercase">Container ID</span>
                       <div className="font-mono text-zinc-800 dark:text-zinc-200 mt-1 truncate">{activeContainer.id}</div>

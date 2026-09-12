@@ -168,26 +168,26 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
   }
 
   return (
-    <div className="flex flex-col h-[520px] bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-[420px] sm:h-[520px] bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
       {/* Terminal Header */}
-      <div className="h-10 bg-zinc-100 dark:bg-[#121215] border-b border-zinc-200 dark:border-zinc-800 px-4 flex items-center justify-between transition-colors">
-        <div className="flex items-center space-x-3">
-          <div className="flex space-x-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+      <div className="h-10 bg-zinc-100 dark:bg-[#121215] border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 flex items-center justify-between transition-colors">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+          <div className="flex space-x-1.5 shrink-0">
+            <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-red-500/80" />
+            <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-yellow-500/80" />
+            <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-green-500/80" />
           </div>
-          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-800" />
-          <div className="flex items-center space-x-2">
-            <TermIcon className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-mono text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-xs">
+          <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-800 shrink-0" />
+          <div className="flex items-center space-x-1.5 min-w-0">
+            <TermIcon className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-xs font-mono text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[100px] sm:max-w-xs">
               {containerName}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          <div className="hidden sm:flex items-center space-x-1">
             <span
               className={`w-2 h-2 rounded-full ${
                 status === 'connected'

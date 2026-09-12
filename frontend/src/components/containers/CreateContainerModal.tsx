@@ -117,10 +117,10 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
               <Box className="w-5 h-5" />
@@ -136,7 +136,7 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 dark:text-red-400">
               {error}
@@ -344,9 +344,9 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newPorts[idx].hostPort = e.target.value;
                     setPorts(newPorts);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
-                <span className="text-zinc-400">:</span>
+                <span className="text-zinc-400 shrink-0">:</span>
                 <input
                   type="text"
                   placeholder="Container Port (e.g. 80)"
@@ -356,12 +356,12 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newPorts[idx].containerPort = e.target.value;
                     setPorts(newPorts);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => removePort(idx)}
-                  className="p-2 text-zinc-400 hover:text-red-500"
+                  className="p-2 text-zinc-400 hover:text-red-500 shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -393,9 +393,9 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newVols[idx].hostPath = e.target.value;
                     setVolumes(newVols);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
-                <span className="text-zinc-400">:</span>
+                <span className="text-zinc-400 shrink-0">:</span>
                 <input
                   type="text"
                   placeholder="Container Mount (/app/data)"
@@ -405,12 +405,12 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newVols[idx].containerPath = e.target.value;
                     setVolumes(newVols);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => removeVolume(idx)}
-                  className="p-2 text-zinc-400 hover:text-red-500"
+                  className="p-2 text-zinc-400 hover:text-red-500 shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -442,9 +442,9 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newEnvs[idx].key = e.target.value;
                     setEnvVars(newEnvs);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
-                <span className="text-zinc-400">=</span>
+                <span className="text-zinc-400 shrink-0">=</span>
                 <input
                   type="text"
                   placeholder="VALUE (e.g. production)"
@@ -454,12 +454,12 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
                     newEnvs[idx].value = e.target.value;
                     setEnvVars(newEnvs);
                   }}
-                  className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
+                  className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg p-2 text-zinc-900 dark:text-zinc-200 font-mono focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={() => removeEnv(idx)}
-                  className="p-2 text-zinc-400 hover:text-red-500"
+                  className="p-2 text-zinc-400 hover:text-red-500 shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

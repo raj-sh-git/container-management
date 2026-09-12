@@ -175,10 +175,10 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
               <Calendar className="w-5 h-5" />
@@ -201,7 +201,7 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {error && (
             <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start space-x-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -385,7 +385,7 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
                   <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-2">
                     Frequency Preset
                   </label>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                     {[
                       { id: 'hourly', label: 'Every Hour', cron: '0 * * * *' },
                       { id: 'daily', label: 'Daily (Midnight)', cron: '0 0 * * *' },
