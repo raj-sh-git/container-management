@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# Production builds & artifacts
+dist/
+**/dist/
+dist-ssr/
+build/
+out/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Application Data & SQLite Databases
+data/
+**/data/
+*.db
+*.db-*
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-*
+*.sqlite3
+
+# Reports & Vulnerability Scans Cache
+reports/
+**/reports/
+trivy-cache/
+**/trivy-cache/
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+*.local
+!*.env.example
+
+# Logs & Debug Output
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# IDE, Editor & OS Files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary & Cache Directories
+.cache/
+tmp/
+temp/
+

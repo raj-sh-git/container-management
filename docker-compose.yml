@@ -1,0 +1,26 @@
+services:
+  container-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: container-manager:latest
+    container_name: docker-control-center
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - JWT_SECRET=change-this-production-jwt-secret-key-32chars
+      - DEFAULT_ADMIN_USER=admin
+      - DEFAULT_ADMIN_PASSWORD=admin123
+      - DATA_DIR=/data
+      # - BASE_PATH=/cm
+    volumes:
+      # Mount host Docker daemon socket
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent volume for DB, Trivy scan reports & cache
+      - manager_data:/data
+
+volumes:
+  manager_data:
