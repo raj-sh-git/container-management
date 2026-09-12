@@ -48,3 +48,27 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+export const cleanupSchedules = sqliteTable('cleanup_schedules', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  scheduleType: text('schedule_type', { enum: ['once', 'recurring'] }).notNull().default('recurring'),
+  frequencyPreset: text('frequency_preset').notNull().default('daily'), // hourly, daily, weekly, monthly, custom, once
+  cronExpression: text('cron_expression'),
+  scheduledAt: text('scheduled_at'), // ISO timestamp for one-time runs
+  cleanImages: integer('clean_images', { mode: 'boolean' }).notNull().default(true),
+  cleanImagesMode: text('clean_images_mode', { enum: ['all', 'dangling'] }).notNull().default('all'),
+  cleanVolumes: integer('clean_volumes', { mode: 'boolean' }).notNull().default(false),
+  cleanNetworks: integer('clean_networks', { mode: 'boolean' }).notNull().default(true),
+  cleanContainers: integer('clean_containers', { mode: 'boolean' }).notNull().default(true),
+  cleanBuildCache: integer('clean_build_cache', { mode: 'boolean' }).notNull().default(true),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  lastRunAt: text('last_run_at'),
+  lastRunStatus: text('last_run_status'), // success, failed, running
+  lastRunSummary: text('last_run_summary'), // JSON string
+  nextRunAt: text('next_run_at'),
+  createdBy: text('created_by'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+

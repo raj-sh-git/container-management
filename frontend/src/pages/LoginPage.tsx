@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Server, Lock, User as UserIcon, ArrowRight, ShieldCheck } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Server, Lock, User as UserIcon, ArrowRight, ShieldCheck, Sun, Moon } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
-  const [username, setUsername] = useState<string>('admin');
-  const [password, setPassword] = useState<string>('admin123');
+  const { isDark, toggleTheme } = useTheme();
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -25,6 +27,18 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex flex-col justify-center items-center p-4 relative overflow-hidden transition-colors">
+      {/* Top Bar with Theme Toggle */}
+      <div className="absolute top-6 right-6 z-20">
+        <button
+          onClick={toggleTheme}
+          type="button"
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="p-2.5 rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white shadow-lg transition-all"
+        >
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-600" />}
+        </button>
+      </div>
+
       {/* Background Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/10 dark:bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -70,7 +84,7 @@ export const LoginPage: React.FC = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Enter username"
                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
@@ -87,7 +101,7 @@ export const LoginPage: React.FC = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Enter password"
                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>

@@ -1,6 +1,6 @@
 {
   "name": "container-management-backend",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "Backend for Docker Container Management Platform with Socket, WebSockets & Security Scanner",
   "main": "dist/index.js",
   "scripts": {

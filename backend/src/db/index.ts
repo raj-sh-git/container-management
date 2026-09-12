@@ -64,6 +64,29 @@ export async function initDatabase() {
       value TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS cleanup_schedules (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      schedule_type TEXT NOT NULL DEFAULT 'recurring',
+      frequency_preset TEXT NOT NULL DEFAULT 'daily',
+      cron_expression TEXT,
+      scheduled_at TEXT,
+      clean_images INTEGER NOT NULL DEFAULT 1,
+      clean_images_mode TEXT NOT NULL DEFAULT 'all',
+      clean_volumes INTEGER NOT NULL DEFAULT 0,
+      clean_networks INTEGER NOT NULL DEFAULT 1,
+      clean_containers INTEGER NOT NULL DEFAULT 1,
+      clean_build_cache INTEGER NOT NULL DEFAULT 1,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_run_at TEXT,
+      last_run_status TEXT,
+      last_run_summary TEXT,
+      next_run_at TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Ensure must_change_password column exists if DB was already created

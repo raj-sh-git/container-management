@@ -83,6 +83,118 @@ export class DockerService {
     return results;
   }
 
+  async executePrune(options: {
+    cleanImages?: boolean;
+    cleanImagesMode?: 'all' | 'dangling';
+    cleanVolumes?: boolean;
+    cleanNetworks?: boolean;
+    cleanContainers?: boolean;
+    cleanBuildCache?: boolean;
+  }) {
+    const results: {
+      spaceReclaimed: number;
+      containersDeleted: string[];
+      imagesDeleted: Array<{ Untagged?: string; Deleted?: string }>;
+      volumesDeleted: string[];
+      networksDeleted: string[];
+      buildCacheReclaimed: number;
+      details: string[];
+    } = {
+      spaceReclaimed: 0,
+      containersDeleted: [],
+      imagesDeleted: [],
+      volumesDeleted: [],
+      networksDeleted: [],
+      buildCacheReclaimed: 0,
+      details: [],
+    };
+
+    // 1. Containers
+    if (options.cleanContainers) {
+      try {
+        const cRes = await this.docker.pruneContainers();
+        if (cRes) {
+          results.containersDeleted = cRes.ContainersDeleted || [];
+          results.spaceReclaimed += cRes.SpaceReclaimed || 0;
+          if (results.containersDeleted.length > 0) {
+            results.details.push(`Deleted ${results.containersDeleted.length} stopped containers`);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error pruning containers:', err.message);
+      }
+    }
+
+    // 2. Images
+    if (options.cleanImages) {
+      try {
+        const filterOpt = options.cleanImagesMode === 'dangling' ? { dangling: { true: true } } : {};
+        const imgRes = await this.docker.pruneImages({ filters: filterOpt });
+        if (imgRes) {
+          results.imagesDeleted = imgRes.ImagesDeleted || [];
+          results.spaceReclaimed += imgRes.SpaceReclaimed || 0;
+          if (results.imagesDeleted.length > 0) {
+            results.details.push(`Deleted ${results.imagesDeleted.length} images (${options.cleanImagesMode || 'all'})`);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error pruning images:', err.message);
+      }
+    }
+
+    // 3. Volumes
+    if (options.cleanVolumes) {
+      try {
+        const vRes = await this.docker.pruneVolumes();
+        if (vRes) {
+          results.volumesDeleted = vRes.VolumesDeleted || [];
+          results.spaceReclaimed += vRes.SpaceReclaimed || 0;
+          if (results.volumesDeleted.length > 0) {
+            results.details.push(`Deleted ${results.volumesDeleted.length} unused volumes`);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error pruning volumes:', err.message);
+      }
+    }
+
+    // 4. Networks
+    if (options.cleanNetworks) {
+      try {
+        const nRes = await this.docker.pruneNetworks();
+        if (nRes) {
+          results.networksDeleted = nRes.NetworksDeleted || [];
+          if (results.networksDeleted.length > 0) {
+            results.details.push(`Deleted ${results.networksDeleted.length} unused networks`);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error pruning networks:', err.message);
+      }
+    }
+
+    // 5. Build Cache
+    if (options.cleanBuildCache) {
+      try {
+        const bRes: any = await (this.docker as any).pruneBuilder?.();
+        if (bRes && bRes.SpaceReclaimed) {
+          results.buildCacheReclaimed = bRes.SpaceReclaimed;
+          results.spaceReclaimed += bRes.SpaceReclaimed;
+          results.details.push(`Reclaimed build cache`);
+        }
+      } catch (err: any) {
+        // safe to ignore if pruneBuilder is not supported
+      }
+    }
+
+    if (results.details.length === 0) {
+      results.details.push('No unused resources needed cleanup.');
+    }
+
+    return results;
+  }
+
+
   // ==================== CONTAINERS ====================
   async listContainers(all: boolean = true) {
     const containers = await this.docker.listContainers({ all });

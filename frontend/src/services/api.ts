@@ -12,6 +12,8 @@ import {
   SystemInfo,
   User,
   RegistryAuth,
+  CleanupSchedule,
+  CreateCleanupScheduleInput,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -295,4 +297,44 @@ export const systemApi = {
     const res = await api.delete('/system/audit');
     return res.data;
   },
+  listCleanupSchedules: async (): Promise<CleanupSchedule[]> => {
+    const res = await api.get<CleanupSchedule[]>('/system/cleanup-schedules');
+    return res.data;
+  },
+  getCleanupSchedules: async (): Promise<CleanupSchedule[]> => {
+    const res = await api.get<CleanupSchedule[]>('/system/cleanup-schedules');
+    return res.data;
+  },
+  createCleanupSchedule: async (data: CreateCleanupScheduleInput): Promise<CleanupSchedule> => {
+    const res = await api.post<CleanupSchedule>('/system/cleanup-schedules', data);
+    return res.data;
+  },
+  updateCleanupSchedule: async (id: string, data: Partial<CreateCleanupScheduleInput>): Promise<CleanupSchedule> => {
+    const res = await api.put<CleanupSchedule>(`/system/cleanup-schedules/${id}`, data);
+    return res.data;
+  },
+  toggleCleanupSchedule: async (id: string): Promise<CleanupSchedule> => {
+    const res = await api.patch<CleanupSchedule>(`/system/cleanup-schedules/${id}/toggle`);
+    return res.data;
+  },
+  runCleanupSchedule: async (id: string): Promise<any> => {
+    const res = await api.post(`/system/cleanup-schedules/${id}/run`);
+    return res.data;
+  },
+  deleteCleanupSchedule: async (id: string): Promise<any> => {
+    const res = await api.delete(`/system/cleanup-schedules/${id}`);
+    return res.data;
+  },
+  cleanupNow: async (options: {
+    cleanImages?: boolean;
+    cleanImagesMode?: 'all' | 'dangling';
+    cleanVolumes?: boolean;
+    cleanNetworks?: boolean;
+    cleanContainers?: boolean;
+    cleanBuildCache?: boolean;
+  }): Promise<any> => {
+    const res = await api.post('/system/cleanup-now', options);
+    return res.data;
+  },
 };
+

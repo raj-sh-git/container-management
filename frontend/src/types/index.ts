@@ -168,3 +168,49 @@ export interface SystemInfo {
   Architecture: string;
   ServerVersion: string;
 }
+
+export interface CleanupSchedule {
+  id: string;
+  name: string;
+  scheduleType: 'once' | 'recurring';
+  frequencyPreset: 'hourly' | 'daily' | 'nightly' | 'weekly' | 'monthly' | 'custom' | 'once';
+  cronExpression?: string;
+  scheduledAt?: string;
+  cleanImages: boolean;
+  cleanImagesMode: 'all' | 'dangling';
+  cleanVolumes: boolean;
+  cleanNetworks: boolean;
+  cleanContainers: boolean;
+  cleanBuildCache: boolean;
+  enabled: boolean;
+  lastRunAt?: string;
+  lastRunStatus?: 'success' | 'failed' | 'running' | null;
+  lastRunSummary?: string;
+  nextRunAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCleanupScheduleInput {
+  name: string;
+  scheduleType: 'once' | 'recurring';
+  frequencyPreset: 'hourly' | 'daily' | 'nightly' | 'weekly' | 'monthly' | 'custom' | 'once';
+  cronExpression?: string;
+  scheduledAt?: string;
+  cleanImages: boolean;
+  cleanImagesMode: 'all' | 'dangling';
+  cleanVolumes: boolean;
+  cleanNetworks: boolean;
+  cleanContainers: boolean;
+  cleanBuildCache: boolean;
+  enabled?: boolean;
+}
+
+export interface ChangelogItem {
+  version: string;
+  date: string;
+  title: string;
+  changes: string[];
+}
+

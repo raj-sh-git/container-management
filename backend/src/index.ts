@@ -24,6 +24,7 @@ import systemRoutes from './routes/system.routes';
 import { handleExecWs } from './websocket/exec';
 import { handleLogsWs } from './websocket/logs';
 import { handleStatsWs } from './websocket/stats';
+import { cleanupSchedulerService } from './services/cleanup-scheduler.service';
 
 // Helper to match WebSocket endpoint from pathname (supports sub-paths like /cce/ws/exec or /ws/exec)
 function getWsEndpoint(pathname: string | null): 'exec' | 'logs' | 'stats' | null {
@@ -38,7 +39,11 @@ async function bootstrap() {
   // 1. Initialize SQLite Database
   await initDatabase();
 
+  // 2. Initialize Auto Clean-Up Scheduler Service
+  cleanupSchedulerService.init();
+
   const app = express();
+
   app.set('trust proxy', true);
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json());
