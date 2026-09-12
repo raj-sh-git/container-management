@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DockerImage, ScanReport, RegistryAuth } from '../types';
+import { DockerImage, Container, ScanReport, RegistryAuth } from '../types';
 import { imagesApi, securityApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ReportViewer } from '../components/security/ReportViewer';
@@ -21,6 +21,7 @@ import {
 
 interface ImagesPageProps {
   images: DockerImage[];
+  containers?: Container[];
   reports: ScanReport[];
   onRefresh: () => void;
   onOpenScanModal: (target: { type: 'image'; name: string; id: string }) => void;
@@ -28,12 +29,14 @@ interface ImagesPageProps {
 
 export const ImagesPage: React.FC<ImagesPageProps> = ({
   images,
+  containers = [],
   reports,
   onRefresh,
   onOpenScanModal,
 }) => {
   const { isOperator } = useAuth();
   const [search, setSearch] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in-use' | 'unused'>('all');
   const [isPullModalOpen, setIsPullModalOpen] = useState<boolean>(false);
   const [pullImageName, setPullImageName] = useState<string>('');
   const [isPrivateRegistry, setIsPrivateRegistry] = useState<boolean>(false);
@@ -54,12 +57,38 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [scanningMap, setScanningMap] = useState<Record<string, boolean>>({});
 
-  const filteredImages = images.filter((img) =>
-    search
-      ? img.repoTags.some((t) => t.toLowerCase().includes(search.toLowerCase())) ||
-        img.shortId.toLowerCase().includes(search.toLowerCase())
-      : true
-  );
+  const isImageInUse = (img: DockerImage): boolean => {
+    if (img.inUse !== undefined) return img.inUse;
+    if (!containers || containers.length === 0) {
+      return (typeof img.containers === 'number' && img.containers > 0) || false;
+    }
+    const cleanId = img.id.replace(/^sha256:/, '');
+    return containers.some((c) => {
+      const cCleanId = c.imageId ? c.imageId.replace(/^sha256:/, '') : '';
+      const matchId = (cCleanId && cCleanId === cleanId) || c.imageId === img.id;
+      const matchTag = img.repoTags.some(
+        (t) => t !== '<none>:<none>' && (t === c.image || c.image === t.split(':')[0] || c.image.startsWith(t.split(':')[0] + ':'))
+      );
+      return matchId || matchTag;
+    });
+  };
+
+  const inUseCount = images.filter((img) => isImageInUse(img)).length;
+  const unusedCount = images.length - inUseCount;
+
+  const filteredImages = images.filter((img) => {
+    const inUse = isImageInUse(img);
+    if (statusFilter === 'in-use' && !inUse) return false;
+    if (statusFilter === 'unused' && inUse) return false;
+
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      img.repoTags.some((t) => t.toLowerCase().includes(q)) ||
+      img.shortId.toLowerCase().includes(q)
+    );
+  });
+
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -188,10 +217,39 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between">
-        <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-          Showing {filteredImages.length} of {images.length} Local Images
+      {/* Search & Filter Bar */}
+      <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              statusFilter === 'all'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            All ({images.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('in-use')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              statusFilter === 'in-use'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            In Use ({inUseCount})
+          </button>
+          <button
+            onClick={() => setStatusFilter('unused')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              statusFilter === 'unused'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+                : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+          >
+            Unused ({unusedCount})
+          </button>
         </div>
 
         <div className="relative w-72">
@@ -224,7 +282,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
               {filteredImages.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-zinc-500 font-sans">
-                    No images found in local Docker store.
+                    No images found matching criteria.
                   </td>
                 </tr>
               ) : (
@@ -232,10 +290,23 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
                   const report = getImageReport(img);
                   const primaryTag = img.repoTags[0] || '<none>:<none>';
                   const isScanning = scanningMap[img.id] || (report && report.status === 'running');
+                  const isUnused = !isImageInUse(img);
+
                   return (
                     <tr key={img.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-bold text-zinc-900 dark:text-zinc-100 font-sans text-sm">{primaryTag}</div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-zinc-900 dark:text-zinc-100 font-sans text-sm">{primaryTag}</span>
+                          {isUnused ? (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                              Unused
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                              In Use
+                            </span>
+                          )}
+                        </div>
                         {img.repoTags.length > 1 && (
                           <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
                             Also: {img.repoTags.slice(1).join(', ')}
@@ -247,6 +318,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
                       <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 font-sans">
                         {new Date(img.created * 1000).toLocaleDateString()}
                       </td>
+
                       <td className="py-3 px-4">
                         {(() => {
                           if (isScanning) {

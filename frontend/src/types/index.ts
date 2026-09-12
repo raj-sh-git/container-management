@@ -76,6 +76,7 @@ export interface DockerImage {
   virtualSize: number;
   labels: Record<string, string>;
   containers: number;
+  inUse?: boolean;
 }
 
 export interface DockerVolume {

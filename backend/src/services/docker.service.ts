@@ -370,19 +370,44 @@ export class DockerService {
 
   // ==================== IMAGES ====================
   async listImages(all: boolean = false) {
-    const images = await this.docker.listImages({ all });
-    return images.map((img) => ({
-      id: img.Id,
-      shortId: img.Id.replace(/^sha256:/, '').substring(0, 12),
-      repoTags: img.RepoTags || ['<none>:<none>'],
-      repoDigests: img.RepoDigests || [],
-      created: img.Created,
-      size: img.Size,
-      virtualSize: img.VirtualSize,
-      labels: img.Labels || {},
-      containers: img.Containers,
-    }));
+    const [images, containers] = await Promise.all([
+      this.docker.listImages({ all }),
+      this.docker.listContainers({ all: true }).catch(() => []),
+    ]);
+
+    const usedImageIds = new Set<string>();
+    const usedImageNames = new Set<string>();
+    for (const c of containers) {
+      if (c.ImageID) {
+        usedImageIds.add(c.ImageID);
+        usedImageIds.add(c.ImageID.replace(/^sha256:/, ''));
+      }
+      if (c.Image) {
+        usedImageNames.add(c.Image);
+      }
+    }
+
+    return images.map((img) => {
+      const cleanId = img.Id.replace(/^sha256:/, '');
+      const isInUseById = usedImageIds.has(img.Id) || usedImageIds.has(cleanId);
+      const isInUseByName = (img.RepoTags || []).some((tag) => usedImageNames.has(tag));
+      const inUse = isInUseById || isInUseByName || (typeof img.Containers === 'number' && img.Containers > 0);
+
+      return {
+        id: img.Id,
+        shortId: cleanId.substring(0, 12),
+        repoTags: img.RepoTags || ['<none>:<none>'],
+        repoDigests: img.RepoDigests || [],
+        created: img.Created,
+        size: img.Size,
+        virtualSize: img.VirtualSize,
+        labels: img.Labels || {},
+        containers: img.Containers,
+        inUse,
+      };
+    });
   }
+
 
   async inspectImage(id: string) {
     const image = this.docker.getImage(id);

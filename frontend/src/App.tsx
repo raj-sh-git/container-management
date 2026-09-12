@@ -189,6 +189,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'images' && (
             <ImagesPage
               images={images}
+              containers={containers}
               reports={reports}
               onRefresh={fetchAllData}
               onOpenScanModal={handleOpenScanWithTarget}
