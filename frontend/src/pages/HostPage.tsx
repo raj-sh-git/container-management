@@ -1,46 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { SystemInfo, CleanupSchedule, CreateCleanupScheduleInput } from '../types';
+import { SystemInfo, HostMetrics } from '../types';
 import { systemApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { CleanupScheduleModal } from '../components/host/CleanupScheduleModal';
 import {
-  Cpu,
-  HardDrive,
-  Trash2,
-  RefreshCw,
   Server,
   Layers,
   Box,
-  CheckCircle2,
-  Calendar,
+  HardDrive,
+  RefreshCw,
+  Wrench,
+  ArrowRight,
+  Activity,
+  Cpu,
   Clock,
-  Play,
-  Edit2,
-  Plus,
-  Network,
-  Sparkles,
-  AlertTriangle,
 } from 'lucide-react';
 
 interface HostPageProps {
   systemInfo: SystemInfo | null;
   onRefresh: () => void;
+  onNavigateToMaintenance?: () => void;
 }
 
-export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => {
+export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNavigateToMaintenance }) => {
   const { isAdmin } = useAuth();
   const [diskUsage, setDiskUsage] = useState<any>(null);
-  const [pruneResult, setPruneResult] = useState<any>(null);
-  const [pruning, setPruning] = useState<boolean>(false);
-  const [pruneAll, setPruneAll] = useState<boolean>(true);
-  const [pruneVolumes, setPruneVolumes] = useState<boolean>(false);
-
-  // Schedules state
-  const [schedules, setSchedules] = useState<CleanupSchedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState<boolean>(false);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingSchedule, setEditingSchedule] = useState<CleanupSchedule | null>(null);
-  const [runningScheduleId, setRunningScheduleId] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<HostMetrics | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
   const loadDf = async () => {
     try {
@@ -51,25 +37,36 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
     }
   };
 
-  const loadSchedules = async () => {
-    if (!isAdmin) return;
-    setLoadingSchedules(true);
+  const loadMetrics = async () => {
     try {
-      const list = await systemApi.getCleanupSchedules();
-      setSchedules(list);
+      const data = await systemApi.hostMetrics();
+      setMetrics(data);
     } catch (err) {
-      console.error('Failed to load cleanup schedules', err);
+      console.error('Failed to load host metrics', err);
+    }
+  };
+
+  const refreshAll = async () => {
+    setLoading(true);
+    try {
+      await Promise.allSettled([loadDf(), loadMetrics()]);
+      onRefresh();
     } finally {
-      setLoadingSchedules(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadDf();
-    if (isAdmin) {
-      loadSchedules();
-    }
-  }, [isAdmin]);
+    refreshAll();
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      loadMetrics();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -79,110 +76,304 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const formatDate = (isoString?: string | null) => {
-    if (!isoString) return 'Never';
-    try {
-      return new Date(isoString).toLocaleString();
-    } catch {
-      return isoString;
-    }
+  const formatUptime = (seconds?: number) => {
+    if (!seconds) return '0m';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${mins}m`);
+    return parts.join(' ');
   };
 
-  const handlePrune = async () => {
-    if (!confirm('Run System Prune? This will permanently delete unused container resources.')) return;
-    setPruning(true);
-    setPruneResult(null);
-    try {
-      const res = await systemApi.prune({ all: pruneAll, volumes: pruneVolumes });
-      setPruneResult(res);
-      loadDf();
-      onRefresh();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Prune failed');
-    } finally {
-      setPruning(false);
-    }
+  const getUsageColor = (pct: number) => {
+    if (pct >= 85) return 'text-rose-500 dark:text-rose-400';
+    if (pct >= 60) return 'text-amber-500 dark:text-amber-400';
+    return 'text-emerald-500 dark:text-emerald-400';
   };
 
-  const handleSaveSchedule = async (data: CreateCleanupScheduleInput, scheduleId?: string) => {
-    if (scheduleId) {
-      await systemApi.updateCleanupSchedule(scheduleId, data);
+  const getUsageBg = (pct: number) => {
+    if (pct >= 85) return 'bg-rose-500';
+    if (pct >= 60) return 'bg-amber-500';
+    return 'bg-emerald-500';
+  };
+
+  const handleOpenMaintenance = () => {
+    if (onNavigateToMaintenance) {
+      onNavigateToMaintenance();
     } else {
-      await systemApi.createCleanupSchedule(data);
+      window.location.hash = 'maintenance';
     }
-    await loadSchedules();
-  };
-
-  const handleToggleSchedule = async (id: string) => {
-    try {
-      await systemApi.toggleCleanupSchedule(id);
-      await loadSchedules();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to toggle schedule');
-    }
-  };
-
-  const handleRunScheduleNow = async (id: string, name: string) => {
-    if (!confirm(`Run cleanup schedule "${name}" now?`)) return;
-    setRunningScheduleId(id);
-    try {
-      const res = await systemApi.runCleanupSchedule(id);
-      const reclaimed = res.summary?.spaceReclaimed || 0;
-      alert(`Cleanup completed successfully! Reclaimed ${formatBytes(reclaimed)}.`);
-      loadDf();
-      await loadSchedules();
-      onRefresh();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to execute schedule');
-    } finally {
-      setRunningScheduleId(null);
-    }
-  };
-
-  const handleDeleteSchedule = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete cleanup schedule "${name}"?`)) return;
-    try {
-      await systemApi.deleteCleanupSchedule(id);
-      await loadSchedules();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete schedule');
-    }
-  };
-
-  const openCreateModal = () => {
-    setEditingSchedule(null);
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (schedule: CleanupSchedule) => {
-    setEditingSchedule(schedule);
-    setIsModalOpen(true);
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 select-text">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Host Daemon & Disk Engine</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Host Info</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Host specifications, storage utilization, automated cleanup scheduler & garbage collection
+            Host hardware specifications, real-time CPU & memory usages, and storage utilization
           </p>
         </div>
 
         <button
-          onClick={() => {
-            loadDf();
-            loadSchedules();
-            onRefresh();
-          }}
-          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors self-start sm:self-auto"
+          onClick={refreshAll}
+          disabled={loading}
+          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors self-start sm:self-auto disabled:opacity-50"
           title="Refresh host metrics"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {/* Host Engine Specs Grid */}
+      {/* SECTION 1: Host CPU & Memory Usages */}
+      <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-5 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20 shrink-0">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Host CPU & Memory Usages</h3>
+                <span className="flex h-2 w-2 relative">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      autoRefresh ? 'bg-emerald-400' : 'bg-zinc-400'
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      autoRefresh ? 'bg-emerald-500' : 'bg-zinc-400'
+                    }`}
+                  />
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Real-time processor & physical memory utilization
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                autoRefresh
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
+              }`}
+              title="Toggle automatic refresh every 5 seconds"
+            >
+              {autoRefresh ? 'Live (5s)' : 'Paused'}
+            </button>
+          </div>
+        </div>
+
+        {metrics ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* CPU Tile */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Cpu className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Host CPU Utilization
+                    </span>
+                  </div>
+                  <span
+                    className={`text-2xl font-black font-mono tracking-tight ${getUsageColor(
+                      metrics.cpu.usagePercent
+                    )}`}
+                  >
+                    {metrics.cpu.usagePercent.toFixed(1)}%
+                  </span>
+                </div>
+
+                {/* Main CPU Bar */}
+                <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className={`h-2.5 rounded-full transition-all duration-500 ${getUsageBg(
+                      metrics.cpu.usagePercent
+                    )}`}
+                    style={{ width: `${Math.min(100, Math.max(2, metrics.cpu.usagePercent))}%` }}
+                  />
+                </div>
+
+                {/* CPU Details */}
+                <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-zinc-200/70 dark:border-zinc-800/60">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">Cores</span>
+                    <div className="font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate">
+                      {metrics.cpu.cores} Cores
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">Load Avg</span>
+                    <div
+                      className="font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate"
+                      title="1m, 5m, 15m load average"
+                    >
+                      {metrics.cpu.loadAvg.map((l) => l.toFixed(1)).join(' · ')}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">Model</span>
+                    <div
+                      className="font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate"
+                      title={metrics.cpu.model}
+                    >
+                      {metrics.cpu.model}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-Core Breakdown */}
+                {metrics.cpu.perCoreUsage && metrics.cpu.perCoreUsage.length > 0 && (
+                  <div className="pt-2 border-t border-zinc-200/70 dark:border-zinc-800/60 space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">
+                      Per-Core Breakdown
+                    </span>
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 font-mono text-[10px]">
+                      {metrics.cpu.perCoreUsage.map((coreUsage, idx) => (
+                        <div
+                          key={idx}
+                          className="p-1 bg-white dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800/80 rounded-lg flex flex-col items-center justify-center space-y-0.5"
+                          title={`Core ${idx + 1}: ${coreUsage}%`}
+                        >
+                          <span className="text-[9px] text-zinc-600 dark:text-zinc-400">C{idx + 1}</span>
+                          <span className={`font-bold ${getUsageColor(coreUsage)}`}>
+                            {Math.round(coreUsage)}%
+                          </span>
+                          <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1 overflow-hidden mt-0.5">
+                            <div
+                              className={`h-1 rounded-full ${getUsageBg(coreUsage)}`}
+                              style={{ width: `${Math.min(100, Math.max(5, coreUsage))}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Memory Tile */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 rounded-xl space-y-3 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Layers className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                        Host Memory Usage
+                      </span>
+                    </div>
+                    <span
+                      className={`text-2xl font-black font-mono tracking-tight ${getUsageColor(
+                        metrics.memory.usagePercent
+                      )}`}
+                    >
+                      {metrics.memory.usagePercent.toFixed(1)}%
+                    </span>
+                  </div>
+
+                  {/* Main Memory Bar */}
+                  <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-2.5 rounded-full transition-all duration-500 ${getUsageBg(
+                        metrics.memory.usagePercent
+                      )}`}
+                      style={{ width: `${Math.min(100, Math.max(2, metrics.memory.usagePercent))}%` }}
+                    />
+                  </div>
+
+                  {/* Memory Details */}
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-zinc-200/70 dark:border-zinc-800/60">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">
+                        Used Memory
+                      </span>
+                      <div className="font-mono font-semibold text-zinc-900 dark:text-zinc-200">
+                        {formatBytes(metrics.memory.usedBytes)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">
+                        Free / Available
+                      </span>
+                      <div className="font-mono font-semibold text-zinc-900 dark:text-zinc-200">
+                        {formatBytes(metrics.memory.freeBytes)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-zinc-600 dark:text-zinc-400">
+                        Total Installed
+                      </span>
+                      <div className="font-mono font-semibold text-zinc-900 dark:text-zinc-200">
+                        {formatBytes(metrics.memory.totalBytes)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Memory Status Pill */}
+                <div className="pt-3 border-t border-zinc-200/70 dark:border-zinc-800/60 flex items-center justify-between text-xs">
+                  <span className="text-zinc-600 dark:text-zinc-400">Memory Pressure Status</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                      metrics.memory.usagePercent < 75
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : metrics.memory.usagePercent < 90
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                    }`}
+                  >
+                    {metrics.memory.usagePercent < 75
+                      ? 'Optimal (Normal Pressure)'
+                      : metrics.memory.usagePercent < 90
+                      ? 'Elevated Memory Usage'
+                      : 'Critical Memory Pressure'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Host Metadata Ribbon */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 rounded-xl text-xs font-mono text-zinc-600 dark:text-zinc-400">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                <span>Host Uptime:</span>
+                <span className="text-zinc-900 dark:text-zinc-200 font-semibold font-mono">
+                  {formatUptime(metrics.uptimeSeconds)}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span>Hostname:</span>
+                <span className="text-zinc-900 dark:text-zinc-200 font-semibold font-mono">
+                  {metrics.hostname}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span>Platform:</span>
+                <span className="text-zinc-900 dark:text-zinc-200 font-semibold font-mono">
+                  {metrics.platform} ({metrics.arch})
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-zinc-600 dark:text-zinc-400 text-xs">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-zinc-400" />
+            <span>Gathering host CPU and memory telemetry...</span>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: Container Engine Specifications Grid */}
       {systemInfo && (
         <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
           <div className="flex items-center space-x-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-3 sm:pb-4">
@@ -221,16 +412,28 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
       {/* Disk Space Breakdown */}
       {diskUsage && (
         <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/20">
+              <div className="p-2 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
                 <HardDrive className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Engine Disk Usage (System Storage Reclaim)</h3>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Engine Disk Usage</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">Total space consumed by images, containers, and volumes</p>
               </div>
             </div>
+
+            {isAdmin && (
+              <button
+                onClick={handleOpenMaintenance}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 text-xs font-semibold transition-all self-start sm:self-auto"
+                title="Open Maintenance to clean up or schedule garbage collection"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>Go to Maintenance</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -284,304 +487,6 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
           </div>
         </div>
       )}
-
-      {/* Auto Clean-Up Schedules Section (Admin only) */}
-      {isAdmin && (
-        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-indigo-500/20 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800/80 pb-3 sm:pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl border border-indigo-500/20 shrink-0">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Automated Clean-Up Scheduler</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Configure recurring or one-time automated garbage collection tasks for container resources
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={openCreateModal}
-              className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all self-start sm:self-auto shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Clean-Up Schedule</span>
-            </button>
-          </div>
-
-          {/* Schedules Table */}
-          {loadingSchedules ? (
-            <div className="text-center py-8 text-xs text-zinc-500">Loading schedules...</div>
-          ) : schedules.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl space-y-2">
-              <Calendar className="w-8 h-8 text-zinc-400 mx-auto" />
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">No automated clean-up schedules configured</p>
-              <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                Create a recurring or one-time schedule to automatically reclaim disk space from unused container resources.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 uppercase text-[10px] tracking-wider font-semibold">
-                    <th className="pb-3 px-3">Schedule Name</th>
-                    <th className="pb-3 px-3">Clean Targets</th>
-                    <th className="pb-3 px-3">Frequency / Type</th>
-                    <th className="pb-3 px-3">Next Run</th>
-                    <th className="pb-3 px-3">Status</th>
-                    <th className="pb-3 px-3">Last Run & Reclaimed</th>
-                    <th className="pb-3 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-medium">
-                  {schedules.map((schedule) => {
-                    const isRunning = runningScheduleId === schedule.id;
-                    let reclaimed = 0;
-                    if (schedule.lastRunSummary) {
-                      try {
-                        const parsed = JSON.parse(schedule.lastRunSummary);
-                        reclaimed = parsed.spaceReclaimed || 0;
-                      } catch {}
-                    }
-
-                    return (
-                      <tr key={schedule.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="font-bold text-zinc-900 dark:text-white">{schedule.name}</div>
-                          <div className="text-[10px] text-zinc-400 font-mono">ID: {schedule.id.slice(0, 8)}...</div>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {schedule.cleanImages && (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-mono font-semibold">
-                                <Layers className="w-3 h-3" />
-                                <span>Images ({schedule.cleanImagesMode})</span>
-                              </span>
-                            )}
-                            {schedule.cleanVolumes && (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-mono font-semibold">
-                                <HardDrive className="w-3 h-3" />
-                                <span>Volumes</span>
-                              </span>
-                            )}
-                            {schedule.cleanNetworks && (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-semibold">
-                                <Network className="w-3 h-3" />
-                                <span>Networks</span>
-                              </span>
-                            )}
-                            {schedule.cleanContainers && (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-mono font-semibold">
-                                <Box className="w-3 h-3" />
-                                <span>Containers</span>
-                              </span>
-                            )}
-                            {schedule.cleanBuildCache && (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[10px] font-mono font-semibold">
-                                <Sparkles className="w-3 h-3" />
-                                <span>Cache</span>
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          {schedule.scheduleType === 'recurring' ? (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold">
-                                <RefreshCw className="w-3 h-3 text-indigo-500" />
-                                <span>Recurring</span>
-                              </span>
-                              <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
-                                {schedule.cronExpression}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold">
-                                <Clock className="w-3 h-3 text-amber-500" />
-                                <span>Run Once</span>
-                              </span>
-                              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                {formatDate(schedule.scheduledAt)}
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <span className="font-mono text-zinc-800 dark:text-zinc-200">
-                            {formatDate(schedule.nextRunAt)}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <button
-                            onClick={() => handleToggleSchedule(schedule.id)}
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
-                              schedule.enabled
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                                : 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/20'
-                            }`}
-                            title="Click to toggle active status"
-                          >
-                            {schedule.enabled ? 'Active' : 'Disabled'}
-                          </button>
-                        </td>
-
-                        <td className="py-3 px-3">
-                          {schedule.lastRunAt ? (
-                            <div className="space-y-0.5">
-                              <div className="flex items-center space-x-1 text-zinc-700 dark:text-zinc-300">
-                                {schedule.lastRunStatus === 'success' ? (
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                ) : (
-                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                                )}
-                                <span className="font-semibold">{formatBytes(reclaimed)} freed</span>
-                              </div>
-                              <div className="text-[10px] text-zinc-400">{formatDate(schedule.lastRunAt)}</div>
-                            </div>
-                          ) : (
-                            <span className="text-zinc-400 text-xs">Never executed</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end space-x-1.5">
-                            <button
-                              onClick={() => handleRunScheduleNow(schedule.id, schedule.name)}
-                              disabled={isRunning}
-                              className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors disabled:opacity-50"
-                              title="Run clean-up now"
-                            >
-                              <Play className={`w-3.5 h-3.5 ${isRunning ? 'animate-spin' : ''}`} />
-                            </button>
-
-                            <button
-                              onClick={() => openEditModal(schedule)}
-                              className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                              title="Edit schedule"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
-                              onClick={() => handleDeleteSchedule(schedule.id, schedule.name)}
-                              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
-                              title="Delete schedule"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* System Prune Section (Manual Prune, Admin only) */}
-      {isAdmin && (
-        <div className="p-6 bg-white dark:bg-zinc-900/80 border border-red-500/20 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-red-500/10 text-red-500 dark:text-red-400 rounded-xl border border-red-500/20">
-              <Trash2 className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Manual Garbage Collection (Prune)</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Instantly reclaim disk space by purging unused images, stopped containers & dangling networks</p>
-            </div>
-          </div>
-
-          <div className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3 text-xs">
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="pruneAll"
-                checked={pruneAll}
-                onChange={(e) => setPruneAll(e.target.checked)}
-                className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
-              />
-              <label htmlFor="pruneAll" className="text-zinc-800 dark:text-zinc-200 font-medium cursor-pointer">
-                Prune all unused images (not just dangling ones)
-              </label>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                id="pruneVolumes"
-                checked={pruneVolumes}
-                onChange={(e) => setPruneVolumes(e.target.checked)}
-                className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
-              />
-              <label htmlFor="pruneVolumes" className="text-zinc-800 dark:text-zinc-200 font-medium cursor-pointer">
-                Prune unused persistent volumes (Warning: data in unused volumes will be lost)
-              </label>
-            </div>
-          </div>
-
-          {pruneResult && (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-600 dark:text-emerald-300 font-mono space-y-1.5">
-              <div className="font-bold flex items-center space-x-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                <span>Prune complete! Reclaimed disk space.</span>
-              </div>
-              {(() => {
-                const total =
-                  pruneResult.totalSpaceReclaimed !== undefined
-                    ? pruneResult.totalSpaceReclaimed
-                    : (pruneResult.containers?.SpaceReclaimed || 0) +
-                      (pruneResult.images?.SpaceReclaimed || 0) +
-                      (pruneResult.volumes?.SpaceReclaimed || 0);
-                const imagesCount = pruneResult.images?.ImagesDeleted?.length || 0;
-                const containersCount = pruneResult.containers?.ContainersDeleted?.length || 0;
-                const volumesCount = pruneResult.volumes?.VolumesDeleted?.length || 0;
-                return (
-                  <div className="space-y-0.5 text-[11px] text-zinc-700 dark:text-zinc-300">
-                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
-                      Total Space Reclaimed: {formatBytes(total)}
-                    </div>
-                    {imagesCount > 0 && <div>• Images Deleted: {imagesCount}</div>}
-                    {containersCount > 0 && <div>• Stopped Containers Deleted: {containersCount}</div>}
-                    {volumesCount > 0 && <div>• Volumes Deleted: {volumesCount}</div>}
-                    {imagesCount === 0 && containersCount === 0 && volumesCount === 0 && total === 0 && (
-                      <div className="text-zinc-500">No unreferenced resources found to reclaim.</div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          <div className="flex justify-end">
-            <button
-              onClick={handlePrune}
-              disabled={pruning}
-              className="flex items-center space-x-2 px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/30 disabled:opacity-50 transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>{pruning ? 'Pruning...' : 'Run System Prune'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Schedule Modal */}
-      <CleanupScheduleModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveSchedule}
-        editingSchedule={editingSchedule}
-      />
     </div>
   );
 };

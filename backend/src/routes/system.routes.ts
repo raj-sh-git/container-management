@@ -21,6 +21,16 @@ router.get('/info', async (req: AuthenticatedRequest, res: Response) => {
   }
 });
 
+// Host metrics (CPU & Memory)
+router.get('/host-metrics', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const metrics = await dockerService.getHostMetrics();
+    res.json(metrics);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to get host metrics' });
+  }
+});
+
 // System version
 router.get('/version', async (req: AuthenticatedRequest, res: Response) => {
   try {

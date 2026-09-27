@@ -1,6 +1,29 @@
 import Docker from 'dockerode';
 import { config } from '../config';
 import os from 'os';
+import fs from 'fs';
+import { execSync } from 'child_process';
+
+export interface HostMetrics {
+  cpu: {
+    usagePercent: number;
+    cores: number;
+    model: string;
+    speedMHz: number;
+    loadAvg: [number, number, number];
+    perCoreUsage: number[];
+  };
+  memory: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usagePercent: number;
+  };
+  uptimeSeconds: number;
+  platform: string;
+  arch: string;
+  hostname: string;
+}
 
 let dockerClient: Docker;
 
@@ -62,6 +85,99 @@ export class DockerService {
 
   async getInfo() {
     return await this.docker.info();
+  }
+
+  async getHostMetrics(): Promise<HostMetrics> {
+    const cpusStart = os.cpus();
+    const startTimes = cpusStart.map((c) => {
+      let total = 0;
+      for (const t in c.times) {
+        total += (c.times as any)[t];
+      }
+      return { idle: c.times.idle, total };
+    });
+
+    // Sample CPU for 100ms
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const cpusEnd = os.cpus();
+    const perCoreUsage: number[] = cpusEnd.map((c, idx) => {
+      const start = startTimes[idx];
+      let endTotal = 0;
+      for (const t in c.times) {
+        endTotal += (c.times as any)[t];
+      }
+      const idleDiff = c.times.idle - (start?.idle ?? 0);
+      const totalDiff = endTotal - (start?.total ?? 0);
+      const pct = totalDiff > 0 ? (1 - idleDiff / totalDiff) * 100 : 0;
+      return Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
+    });
+
+    const avgCpu =
+      perCoreUsage.length > 0
+        ? Math.round((perCoreUsage.reduce((a, b) => a + b, 0) / perCoreUsage.length) * 10) / 10
+        : 0;
+
+    // Memory Calculation
+    const totalMem = os.totalmem();
+    let freeMem = os.freemem();
+
+    if (process.platform === 'linux') {
+      try {
+        if (fs.existsSync('/proc/meminfo')) {
+          const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');
+          const availableMatch = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/);
+          if (availableMatch && availableMatch[1]) {
+            freeMem = parseInt(availableMatch[1], 10) * 1024;
+          }
+        }
+      } catch {
+        // Fallback to os.freemem()
+      }
+    } else if (process.platform === 'darwin') {
+      try {
+        const out = execSync('vm_stat', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 });
+        const pageSizeMatch = out.match(/page size of (\d+) bytes/);
+        const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1], 10) : 4096;
+        const free = parseInt((out.match(/Pages free:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
+        const inactive = parseInt((out.match(/Pages inactive:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
+        const speculative = parseInt((out.match(/Pages speculative:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
+        const available = free + inactive + speculative;
+        if (available > 0 && available < totalMem) {
+          freeMem = available;
+        }
+      } catch {
+        // Fallback to os.freemem()
+      }
+    }
+
+    const usedMem = Math.max(0, totalMem - freeMem);
+    const memPercent = totalMem > 0 ? Math.round((usedMem / totalMem) * 1000) / 10 : 0;
+
+    return {
+      cpu: {
+        usagePercent: avgCpu,
+        cores: cpusEnd.length,
+        model: cpusEnd[0]?.model || os.arch(),
+        speedMHz: cpusEnd[0]?.speed || 0,
+        loadAvg: [
+          Math.round(os.loadavg()[0] * 100) / 100,
+          Math.round(os.loadavg()[1] * 100) / 100,
+          Math.round(os.loadavg()[2] * 100) / 100,
+        ],
+        perCoreUsage,
+      },
+      memory: {
+        totalBytes: totalMem,
+        usedBytes: usedMem,
+        freeBytes: freeMem,
+        usagePercent: memPercent,
+      },
+      uptimeSeconds: Math.floor(os.uptime()),
+      platform: os.platform(),
+      arch: os.arch(),
+      hostname: os.hostname(),
+    };
   }
 
   async getVersion() {

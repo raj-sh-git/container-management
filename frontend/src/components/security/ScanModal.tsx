@@ -106,17 +106,17 @@ export const ScanModal: React.FC<ScanModalProps> = ({
       <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
         isMaximized ? 'w-full h-full inset-0 rounded-none max-w-none' : 'rounded-2xl max-w-lg w-full'
       }`}>
-        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4 gap-3 min-w-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
               <ShieldAlert className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Run Trivy Security Scan</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Scan for CVEs, packages & configurations</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Run Trivy Security Scan</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Scan for CVEs, packages & configurations</p>
             </div>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 shrink-0">
             <button
               onClick={() => setIsMinimized(true)}
               className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

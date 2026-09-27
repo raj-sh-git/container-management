@@ -162,17 +162,17 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
         isMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh]'
       }`}>
         {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
+        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
               <Box className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Create & Run Container</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Configure parameters, ports, volumes and resources</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Create & Run Container</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Configure parameters, ports, volumes and resources</p>
             </div>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 shrink-0">
             <button
               onClick={() => setIsMinimized(true)}
               className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

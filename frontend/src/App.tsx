@@ -14,6 +14,7 @@ import { SecurityPage } from './pages/SecurityPage';
 import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
 import { HostPage } from './pages/HostPage';
+import { MaintenancePage } from './pages/MaintenancePage';
 import { CreateContainerModal } from './components/containers/CreateContainerModal';
 import { ScanModal } from './components/security/ScanModal';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
@@ -48,6 +49,7 @@ const VALID_TABS: NavTab[] = [
   'users',
   'audit',
   'host',
+  'maintenance',
 ];
 
 const getInitialTab = (): NavTab => {
@@ -274,7 +276,15 @@ const AppContent: React.FC = () => {
           {activeTab === 'audit' && isAdmin && <AuditPage />}
 
           {activeTab === 'host' && (
-            <HostPage systemInfo={systemInfo} onRefresh={fetchAllData} />
+            <HostPage
+              systemInfo={systemInfo}
+              onRefresh={fetchAllData}
+              onNavigateToMaintenance={() => setActiveTab('maintenance')}
+            />
+          )}
+
+          {activeTab === 'maintenance' && (
+            <MaintenancePage onRefresh={fetchAllData} />
           )}
         </main>
       </div>

@@ -139,17 +139,29 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
     // Handle resize
     const handleResize = () => {
       if (fitAddon && term && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        fitAddon.fit();
-        wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        try {
+          fitAddon.fit();
+          wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        } catch {
+          // ignore fit error if detached
+        }
       }
     };
 
     window.addEventListener('resize', handleResize);
 
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    if (terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
+
     connect();
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       if (wsRef.current) wsRef.current.close();
       term.dispose();
     };
@@ -168,7 +180,7 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
   }
 
   return (
-    <div className="flex flex-col h-[420px] sm:h-[520px] bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+    <div className="flex flex-col flex-1 h-full min-h-[350px] bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
       {/* Terminal Header */}
       <div className="h-10 bg-zinc-100 dark:bg-[#121215] border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 flex items-center justify-between transition-colors">
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
@@ -221,7 +233,7 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
       </div>
 
       {/* Terminal Viewport */}
-      <div ref={terminalRef} className="flex-1 p-2 overflow-hidden bg-[#09090b]" />
+      <div ref={terminalRef} className="flex-1 p-2 overflow-hidden bg-[#09090b] min-h-0" />
     </div>
   );
 };

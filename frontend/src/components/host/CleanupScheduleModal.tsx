@@ -220,21 +220,21 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
         isMaximized ? 'w-full h-full inset-0 rounded-none max-w-none' : 'rounded-3xl max-w-xl w-full max-h-[92vh] sm:max-h-[90vh]'
       }`}>
         {/* Header */}
-        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+        <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20 shrink-0">
               <Calendar className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-base font-black text-zinc-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-black text-zinc-900 dark:text-white truncate">
                 {editingSchedule ? 'Edit Clean-Up Schedule' : 'Schedule Auto Clean-Up'}
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                 Automate container garbage collection with recurring or one-time schedules
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 shrink-0">
             <button
               onClick={() => setIsMinimized(true)}
               className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

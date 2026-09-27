@@ -17,6 +17,7 @@ import {
   ScalingInfo,
   ScalingPolicy,
   CreateScalingPolicyInput,
+  HostMetrics,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -290,6 +291,10 @@ export const securityApi = {
 export const systemApi = {
   info: async (): Promise<SystemInfo> => {
     const res = await api.get<SystemInfo>('/system/info');
+    return res.data;
+  },
+  hostMetrics: async (): Promise<HostMetrics> => {
+    const res = await api.get<HostMetrics>('/system/host-metrics');
     return res.data;
   },
   version: async (): Promise<any> => {

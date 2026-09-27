@@ -7,7 +7,7 @@ import { WebTerminal } from '../components/terminal/WebTerminal';
 import { LogsViewer } from '../components/logs/LogsViewer';
 import { StatsCards } from '../components/stats/StatsCards';
 import { ReportViewer } from '../components/security/ReportViewer';
-import { ScaleModal } from '../components/containers/ScaleModal';
+import { ScalePanel } from '../components/containers/ScalePanel';
 import {
   Box,
   Boxes,
@@ -41,6 +41,13 @@ import {
   Shield,
 } from 'lucide-react';
 
+export type ContainerDetailTab = 'overview' | 'terminal' | 'logs' | 'stats' | 'inspect' | 'scale';
+
+export interface MinimizedContainerWindow {
+  container: Container;
+  tab: ContainerDetailTab;
+}
+
 interface ContainersPageProps {
   containers: Container[];
   images: DockerImage[];
@@ -71,10 +78,10 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   const [activeContainer, setActiveContainer] = useState<Container | null>(
     selectedContainerForDetail || null
   );
-  const [detailTab, setDetailTab] = useState<'overview' | 'terminal' | 'logs' | 'stats' | 'inspect'>(
-    (initialDetailTab as any) || 'overview'
+  const [detailTab, setDetailTab] = useState<ContainerDetailTab>(
+    (initialDetailTab as ContainerDetailTab) || 'overview'
   );
-  const [isDetailMinimized, setIsDetailMinimized] = useState<boolean>(false);
+  const [minimizedContainers, setMinimizedContainers] = useState<MinimizedContainerWindow[]>([]);
   const [isDetailMaximized, setIsDetailMaximized] = useState<boolean>(false);
   const [inspectData, setInspectData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -83,8 +90,6 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   const [isReportMinimized, setIsReportMinimized] = useState<boolean>(false);
   const [isReportMaximized, setIsReportMaximized] = useState<boolean>(false);
   const [scanningMap, setScanningMap] = useState<Record<string, boolean>>({});
-  const [isScaleModalOpen, setIsScaleModalOpen] = useState<boolean>(false);
-  const [scaleTarget, setScaleTarget] = useState<Container | null>(null);
 
   const handleToggleFlag = async (containerId: string, flag: 'isProtected' | 'isHidden', currentValue: boolean) => {
     setFlagLoading(`${containerId}-${flag}`);
@@ -104,12 +109,103 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   // Synchronize when parent passes selected container
   React.useEffect(() => {
     if (selectedContainerForDetail) {
-      setActiveContainer(selectedContainerForDetail);
-      if (initialDetailTab) {
-        setDetailTab(initialDetailTab as any);
-      }
+      handleOpenContainerModal(
+        selectedContainerForDetail,
+        (initialDetailTab as ContainerDetailTab) || 'overview'
+      );
     }
   }, [selectedContainerForDetail, initialDetailTab]);
+
+  // Synchronize active and minimized containers with live container list
+  React.useEffect(() => {
+    if (activeContainer) {
+      const updatedActive = containers.find((c) => c.id === activeContainer.id);
+      if (updatedActive) {
+        setActiveContainer(updatedActive);
+      }
+    }
+    if (minimizedContainers.length > 0) {
+      setMinimizedContainers((prev) =>
+        prev.map((item) => {
+          const updated = containers.find((c) => c.id === item.container.id);
+          return updated ? { ...item, container: updated } : item;
+        })
+      );
+    }
+  }, [containers]);
+
+  const handleOpenContainerModal = (
+    c: Container,
+    tab: ContainerDetailTab = 'overview'
+  ) => {
+    // 1. If this container is currently minimized, pop it back up
+    const existingMinimized = minimizedContainers.find((item) => item.container.id === c.id);
+    if (existingMinimized) {
+      setMinimizedContainers((prev) => prev.filter((item) => item.container.id !== c.id));
+      if (activeContainer && activeContainer.id !== c.id) {
+        setMinimizedContainers((prev) => [
+          ...prev.filter((item) => item.container.id !== activeContainer.id),
+          { container: activeContainer, tab: detailTab },
+        ]);
+      }
+      setActiveContainer(c);
+      setDetailTab(tab !== 'overview' ? tab : (existingMinimized.tab || 'overview'));
+      setIsDetailMaximized(false);
+      return;
+    }
+
+    // 2. If it is already open as activeContainer, switch to desired tab
+    if (activeContainer && activeContainer.id === c.id) {
+      if (tab) setDetailTab(tab);
+      return;
+    }
+
+    // 3. Opening another container when one is active: minimize active one so it is not lost
+    if (activeContainer) {
+      setMinimizedContainers((prev) => [
+        ...prev.filter((item) => item.container.id !== activeContainer.id),
+        { container: activeContainer, tab: detailTab },
+      ]);
+    }
+
+    setActiveContainer(c);
+    setDetailTab(tab);
+    setIsDetailMaximized(false);
+  };
+
+  const handleMinimizeActiveContainer = () => {
+    if (!activeContainer) return;
+    setMinimizedContainers((prev) => [
+      ...prev.filter((item) => item.container.id !== activeContainer.id),
+      { container: activeContainer, tab: detailTab },
+    ]);
+    setActiveContainer(null);
+    setIsDetailMaximized(false);
+  };
+
+  const handleRestoreMinimized = (item: MinimizedContainerWindow) => {
+    if (activeContainer) {
+      setMinimizedContainers((prev) => [
+        ...prev.filter(
+          (p) => p.container.id !== activeContainer.id && p.container.id !== item.container.id
+        ),
+        { container: activeContainer, tab: detailTab },
+      ]);
+    } else {
+      setMinimizedContainers((prev) => prev.filter((p) => p.container.id !== item.container.id));
+    }
+    setActiveContainer(item.container);
+    setDetailTab(item.tab);
+  };
+
+  const handleCloseMinimized = (containerId: string) => {
+    setMinimizedContainers((prev) => prev.filter((p) => p.container.id !== containerId));
+  };
+
+  const handleCloseActiveModal = () => {
+    setActiveContainer(null);
+    setIsDetailMaximized(false);
+  };
 
   const filteredContainers = containers.filter((c) => {
     const matchesState =
@@ -200,8 +296,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   };
 
   const openInspect = async (c: Container) => {
-    setActiveContainer(c);
-    setDetailTab('inspect');
+    handleOpenContainerModal(c, 'inspect');
     try {
       const data = await containersApi.get(c.id);
       setInspectData(data);
@@ -407,8 +502,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => {
-                                setActiveContainer(c);
-                                setDetailTab('overview');
+                                handleOpenContainerModal(c, 'overview');
                               }}
                               className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-blue-500 text-left font-sans text-sm flex items-center space-x-1.5"
                             >
@@ -621,8 +715,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           {c.state === 'running' && isOperator && (
                             <button
                               onClick={() => {
-                                setActiveContainer(c);
-                                setDetailTab('terminal');
+                                handleOpenContainerModal(c, 'terminal');
                               }}
                               title="Open Terminal (Exec)"
                               className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-blue-500"
@@ -634,8 +727,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           {/* Logs Shortcut */}
                           <button
                             onClick={() => {
-                              setActiveContainer(c);
-                              setDetailTab('logs');
+                              handleOpenContainerModal(c, 'logs');
                             }}
                             title="Live Logs"
                             className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
@@ -647,8 +739,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           {c.state === 'running' && (
                             <button
                               onClick={() => {
-                                setActiveContainer(c);
-                                setDetailTab('stats');
+                                handleOpenContainerModal(c, 'stats');
                               }}
                               title="Live Performance Metrics"
                               className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white"
@@ -661,8 +752,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           {isOperator && !c.isSelf && (
                             <button
                               onClick={() => {
-                                setScaleTarget(c);
-                                setIsScaleModalOpen(true);
+                                handleOpenContainerModal(c, 'scale');
                               }}
                               title="Scale & Autoscaling"
                               className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20"
@@ -742,122 +832,131 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
       </div>
 
       {/* Container Details Modal / Tabbed Drawer */}
-      {activeContainer && isDetailMinimized && createPortal(
-        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
-          <div className="flex items-center space-x-2">
-            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
-              <Box className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <p className="font-bold text-zinc-900 dark:text-white truncate max-w-[150px]">{activeContainer.name}</p>
-                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
-                  {activeContainer.state}
-                </span>
+      {/* Minimized Container Windows Dock */}
+      {minimizedContainers.length > 0 && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] flex flex-wrap-reverse gap-2 items-center justify-end max-w-[90vw] pointer-events-none">
+          {minimizedContainers.map((item) => (
+            <div
+              key={item.container.id}
+              className="pointer-events-auto bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-2.5 sm:p-3 flex items-center space-x-2.5 text-xs animate-in slide-in-from-bottom-5 transition-all hover:border-blue-500/50"
+            >
+              <div className="flex items-center space-x-2 min-w-0">
+                <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20 shrink-0">
+                  <Box className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-bold text-zinc-900 dark:text-white truncate max-w-[120px] sm:max-w-[150px]">
+                      {item.container.name}
+                    </span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold uppercase border ${getStateBadge(item.container.state)} shrink-0`}>
+                      {item.container.state}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 capitalize">{item.tab}</p>
+                </div>
               </div>
-              <p className="text-[10px] text-zinc-400 capitalize">{detailTab}</p>
+
+              <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800 shrink-0">
+                <button
+                  onClick={() => handleRestoreMinimized(item)}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Restore window"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleCloseMinimized(item.container.id)}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
-            <button
-              onClick={() => setIsDetailMinimized(false)}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Restore window"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setActiveContainer(null);
-                setIsDetailMinimized(false);
-                setIsDetailMaximized(false);
-              }}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Close"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          ))}
         </div>,
         document.body
       )}
 
-      {activeContainer && !isDetailMinimized && createPortal(
+      {/* Active Container Details Modal */}
+      {activeContainer && createPortal(
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden ${
             isDetailMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-5xl w-full h-[95vh] sm:h-[90vh]'
           }`}>
             {/* Modal Header */}
-            <div className="p-4 sm:px-6 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <div className="flex items-center justify-between w-full lg:w-auto">
-                <div className="flex items-center space-x-3">
+            <div className="p-3 sm:px-6 sm:py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center justify-between min-w-0 flex-1 gap-2">
+                <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 flex-1">
                   <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
                     <Box className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight truncate max-w-[170px] xs:max-w-[220px] sm:max-w-md">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0 flex-wrap">
+                      <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white tracking-tight truncate max-w-[180px] xs:max-w-[220px] sm:max-w-xs md:max-w-sm">
                         {activeContainer.name}
                       </h2>
                       {activeContainer.isSelf && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1 shrink-0">
                           <ShieldCheck className="w-3 h-3" />
                           <span>Self</span>
                         </span>
                       )}
                       {activeContainer.isProtected && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1 shrink-0">
                           <Lock className="w-3 h-3" />
                           <span>Protected</span>
                         </span>
                       )}
                       {activeContainer.isHidden && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1 shrink-0">
                           <EyeOff className="w-3 h-3" />
                           <span>Hidden</span>
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border shrink-0 ${getStateBadge(activeContainer.state)}`}>
                         {activeContainer.state}
                       </span>
                     </div>
-                    <p className="text-[11px] sm:text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate max-w-xs sm:max-w-md">{activeContainer.image}</p>
+                    <p
+                      className="text-[11px] sm:text-xs font-mono text-zinc-500 dark:text-zinc-400 truncate w-full max-w-full block mt-0.5"
+                      title={activeContainer.image}
+                    >
+                      {activeContainer.image}
+                    </p>
                   </div>
                 </div>
 
                 {/* Mobile controls */}
-                <div className="flex items-center space-x-1 lg:hidden">
+                <div className="flex md:hidden items-center space-x-1 shrink-0">
                   <button
-                    onClick={() => setIsDetailMinimized(true)}
-                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                    onClick={handleMinimizeActiveContainer}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     title="Minimize"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setIsDetailMaximized(!isDetailMaximized)}
-                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     title={isDetailMaximized ? "Restore" : "Maximize"}
                   >
                     {isDetailMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
                   <button
-                    onClick={() => {
-                      setActiveContainer(null);
-                      setIsDetailMinimized(false);
-                      setIsDetailMaximized(false);
-                    }}
-                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
-                    aria-label="Close modal"
+                    onClick={handleCloseActiveModal}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    title="Close"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Tabs Switcher & Window controls */}
-              <div className="flex items-center justify-between lg:justify-end space-x-2 w-full lg:w-auto">
-                <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold overflow-x-auto max-w-full">
+              {/* Tabs Switcher & Desktop Window Controls */}
+              <div className="flex items-center justify-between md:justify-end space-x-2 w-full md:w-auto shrink-0 min-w-0">
+                <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold overflow-x-auto min-w-0 max-w-full">
                   <button
                     onClick={() => setDetailTab('overview')}
                     className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
@@ -904,11 +1003,12 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   </button>
                   {isOperator && !activeContainer.isSelf && (
                     <button
-                      onClick={() => {
-                        setScaleTarget(activeContainer);
-                        setIsScaleModalOpen(true);
-                      }}
-                      className="px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 transition-all font-semibold flex items-center space-x-1"
+                      onClick={() => setDetailTab('scale')}
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+                        detailTab === 'scale'
+                          ? 'bg-purple-600 text-white shadow'
+                          : 'text-purple-600 dark:text-purple-400 hover:bg-purple-500/10'
+                      }`}
                       title="Scale container replicas & configure autoscaling"
                     >
                       <Boxes className="w-3.5 h-3.5" />
@@ -917,10 +1017,10 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   )}
                 </div>
 
-                {/* Desktop Window Controls (Minimize, Maximize, Close) */}
-                <div className="hidden lg:flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+                {/* Desktop Window Controls */}
+                <div className="hidden md:flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800 shrink-0">
                   <button
-                    onClick={() => setIsDetailMinimized(true)}
+                    onClick={handleMinimizeActiveContainer}
                     className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     title="Minimize"
                     aria-label="Minimize modal"
@@ -936,11 +1036,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                     {isDetailMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
                   <button
-                    onClick={() => {
-                      setActiveContainer(null);
-                      setIsDetailMinimized(false);
-                      setIsDetailMaximized(false);
-                    }}
+                    onClick={handleCloseActiveModal}
                     className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     aria-label="Close modal"
                   >
@@ -951,7 +1047,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
             </div>
 
             {/* Tab Content */}
-            <div className="p-4 sm:p-6 flex-1 overflow-y-auto">
+            <div className={`p-4 sm:p-6 flex-1 ${['terminal', 'logs'].includes(detailTab) ? 'flex flex-col min-h-0 overflow-hidden' : 'overflow-y-auto'}`}>
               {detailTab === 'overview' && (
                 <div className="space-y-6 text-xs">
                   {/* Basic Metadata */}
@@ -1098,6 +1194,14 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   {JSON.stringify(inspectData || activeContainer, null, 2)}
                 </pre>
               )}
+
+              {detailTab === 'scale' && (
+                <ScalePanel
+                  containerId={activeContainer.id}
+                  containerName={activeContainer.name}
+                  onScaled={onRefresh}
+                />
+              )}
             </div>
           </div>
         </div>,
@@ -1195,20 +1299,6 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
           </div>
         </div>,
         document.body
-      )}
-
-      {/* Scale & Autoscaling Modal */}
-      {scaleTarget && (
-        <ScaleModal
-          isOpen={isScaleModalOpen}
-          onClose={() => {
-            setIsScaleModalOpen(false);
-            setScaleTarget(null);
-          }}
-          containerId={scaleTarget.id}
-          containerName={scaleTarget.name}
-          onScaled={onRefresh}
-        />
       )}
     </div>
   );

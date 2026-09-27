@@ -618,17 +618,17 @@ export const UsersPage: React.FC = () => {
           <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
             isAddMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
           }`}>
-            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
                   <Users className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">Create New User</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Add an administrator, operator, or viewer account</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Create New User</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Add an administrator, operator, or viewer account</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 shrink-0">
                 <button
                   onClick={() => setIsAddMinimized(true)}
                   className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -797,9 +797,9 @@ export const UsersPage: React.FC = () => {
           <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 transition-all flex flex-col ${
             isResetMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full p-6'
           }`}>
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Reset Password for {resetUser.username}</h3>
-              <div className="flex items-center space-x-1">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 gap-3 min-w-0">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate min-w-0 flex-1">Reset Password for {resetUser.username}</h3>
+              <div className="flex items-center space-x-1 shrink-0">
                 <button
                   onClick={() => setIsResetMinimized(true)}
                   className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -926,19 +926,19 @@ export const UsersPage: React.FC = () => {
             isBulkMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-3xl max-w-4xl w-full max-h-[92vh] sm:max-h-[90vh]'
           }`}>
             {/* Header */}
-            <div className="p-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20">
+            <div className="p-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20 shrink-0">
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">Bulk Create & Import Users</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Bulk Create & Import Users</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                     Upload CSV or JSON backup with automated client-side validation
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 shrink-0">
                 <button
                   onClick={() => setIsBulkMinimized(true)}
                   className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

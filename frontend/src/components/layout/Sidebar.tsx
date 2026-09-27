@@ -15,6 +15,7 @@ import {
   Sparkles,
   X,
   Server,
+  Wrench,
 } from 'lucide-react';
 
 export type NavTab =
@@ -27,7 +28,8 @@ export type NavTab =
   | 'security'
   | 'users'
   | 'audit'
-  | 'host';
+  | 'host'
+  | 'maintenance';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -62,7 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'volumes', label: 'Volumes', icon: <HardDrive className="w-4 h-4" />, count: counts?.volumes },
     { id: 'networks', label: 'Networks', icon: <Network className="w-4 h-4" />, count: counts?.networks },
     { id: 'security', label: 'Trivy Security', icon: <ShieldAlert className="w-4 h-4" />, count: counts?.reports },
-    { id: 'host', label: 'Host & Engine', icon: <Cpu className="w-4 h-4" /> },
+    { id: 'host', label: 'Host Info', icon: <Cpu className="w-4 h-4" /> },
+    { id: 'maintenance', label: 'Maintenance', icon: <Wrench className="w-4 h-4" />, adminOnly: true },
     { id: 'users', label: 'User RBAC', icon: <Users className="w-4 h-4" />, adminOnly: true },
     { id: 'audit', label: 'Audit Logs', icon: <ScrollText className="w-4 h-4" />, adminOnly: true },
   ];

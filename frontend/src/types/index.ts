@@ -281,4 +281,26 @@ export interface CreateScalingPolicyInput {
   cooldownSeconds: number;
 }
 
+export interface HostMetrics {
+  cpu: {
+    usagePercent: number;
+    cores: number;
+    model: string;
+    speedMHz: number;
+    loadAvg: [number, number, number];
+    perCoreUsage: number[];
+  };
+  memory: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usagePercent: number;
+  };
+  uptimeSeconds: number;
+  platform: string;
+  arch: string;
+  hostname: string;
+}
+
+
 
