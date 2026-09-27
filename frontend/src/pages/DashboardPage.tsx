@@ -123,7 +123,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="p-5 bg-white dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-2xl cursor-pointer transition-all hover:scale-[1.01] group shadow-sm dark:shadow-xl"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Docker Images</span>
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Container Images</span>
             <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
               <Layers className="w-5 h-5" />
             </div>
@@ -183,7 +183,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               <Server className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 dark:text-blue-400 shrink-0" />
               <h3 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Host Engine Telemetry</h3>
             </div>
-            <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">Docker {systemInfo.ServerVersion}</span>
+            <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">Engine {systemInfo.ServerVersion}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs">

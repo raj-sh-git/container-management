@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Container, DockerImage, DockerNetwork, ScanReport } from '../types';
 import { containersApi, securityApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -6,8 +7,10 @@ import { WebTerminal } from '../components/terminal/WebTerminal';
 import { LogsViewer } from '../components/logs/LogsViewer';
 import { StatsCards } from '../components/stats/StatsCards';
 import { ReportViewer } from '../components/security/ReportViewer';
+import { ScaleModal } from '../components/containers/ScaleModal';
 import {
   Box,
+  Boxes,
   Play,
   Square,
   RefreshCw,
@@ -28,6 +31,14 @@ import {
   ShieldCheck,
   AlertCircle,
   Loader2,
+  Minus,
+  Maximize2,
+  Minimize2,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Shield,
 } from 'lucide-react';
 
 interface ContainersPageProps {
@@ -53,7 +64,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   selectedContainerForDetail,
   initialDetailTab,
 }) => {
-  const { isOperator } = useAuth();
+  const { isOperator, isAdmin } = useAuth();
   const [filterState, setFilterState] = useState<'all' | 'running' | 'stopped'>('all');
   const [search, setSearch] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -63,10 +74,32 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   const [detailTab, setDetailTab] = useState<'overview' | 'terminal' | 'logs' | 'stats' | 'inspect'>(
     (initialDetailTab as any) || 'overview'
   );
+  const [isDetailMinimized, setIsDetailMinimized] = useState<boolean>(false);
+  const [isDetailMaximized, setIsDetailMaximized] = useState<boolean>(false);
   const [inspectData, setInspectData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [flagLoading, setFlagLoading] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isReportMinimized, setIsReportMinimized] = useState<boolean>(false);
+  const [isReportMaximized, setIsReportMaximized] = useState<boolean>(false);
   const [scanningMap, setScanningMap] = useState<Record<string, boolean>>({});
+  const [isScaleModalOpen, setIsScaleModalOpen] = useState<boolean>(false);
+  const [scaleTarget, setScaleTarget] = useState<Container | null>(null);
+
+  const handleToggleFlag = async (containerId: string, flag: 'isProtected' | 'isHidden', currentValue: boolean) => {
+    setFlagLoading(`${containerId}-${flag}`);
+    try {
+      await containersApi.updateFlags(containerId, { [flag]: !currentValue });
+      if (activeContainer && activeContainer.id === containerId) {
+        setActiveContainer({ ...activeContainer, [flag]: !currentValue });
+      }
+      onRefresh();
+    } catch (err: any) {
+      alert(err.response?.data?.error || `Failed to update ${flag}`);
+    } finally {
+      setFlagLoading(null);
+    }
+  };
 
   // Synchronize when parent passes selected container
   React.useEffect(() => {
@@ -115,7 +148,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   const handleAction = async (action: 'start' | 'stop' | 'restart' | 'pause' | 'unpause' | 'delete', id: string) => {
     const target = containers.find((c) => c.id === id);
     if (target?.isSelf && (action === 'stop' || action === 'restart' || action === 'delete')) {
-      alert('Action blocked: Cannot stop, restart, or delete the Container Control Center platform itself.');
+      alert('Action blocked: Cannot stop, restart, or delete the Container Manager platform itself.');
       return;
     }
 
@@ -382,9 +415,27 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                               <span>{c.name}</span>
                             </button>
                             {c.isSelf && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Self-container running Container Control Center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform self container">
                                 <ShieldCheck className="w-3 h-3" />
                                 <span>Self</span>
+                              </span>
+                            )}
+                            {c.isProtected && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1" title="Protected against stopping and deletion">
+                                <Lock className="w-3 h-3" />
+                                <span>Protected</span>
+                              </span>
+                            )}
+                            {c.isHidden && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1" title="Hidden from operators and viewers">
+                                <EyeOff className="w-3 h-3" />
+                                <span>Hidden</span>
+                              </span>
+                            )}
+                            {c.name.match(/-replica-\d+$/) && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1" title="Scaled replica container">
+                                <Boxes className="w-2.5 h-2.5" />
+                                <span>Replica</span>
                               </span>
                             )}
                           </div>
@@ -518,6 +569,23 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                                   <RefreshCw className="w-3.5 h-3.5" />
                                 </button>
                               </>
+                            ) : (!isAdmin && c.isProtected) ? (
+                              <>
+                                <button
+                                  disabled
+                                  title="Protected Container - Cannot be stopped by non-admins"
+                                  className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500/50 cursor-not-allowed border border-amber-500/20"
+                                >
+                                  <Square className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  disabled
+                                  title="Protected Container - Cannot be restarted by non-admins"
+                                  className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500/50 cursor-not-allowed border border-amber-500/20"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                              </>
                             ) : (
                               <>
                                 <button
@@ -541,8 +609,8 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           ) : (
                             <button
                               onClick={() => handleAction('start', c.id)}
-                              disabled={actionLoading === c.id}
-                              title="Start Container"
+                              disabled={actionLoading === c.id || (!isAdmin && c.isProtected)}
+                              title={(!isAdmin && c.isProtected) ? "Protected container" : "Start Container"}
                               className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                             >
                               <Play className="w-3.5 h-3.5" />
@@ -589,6 +657,20 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                             </button>
                           )}
 
+                          {/* Scale / Autoscaling */}
+                          {isOperator && !c.isSelf && (
+                            <button
+                              onClick={() => {
+                                setScaleTarget(c);
+                                setIsScaleModalOpen(true);
+                              }}
+                              title="Scale & Autoscaling"
+                              className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/20"
+                            >
+                              <Boxes className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           {/* Delete */}
                           {isOperator && (
                             c.isSelf ? (
@@ -596,6 +678,14 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                                 disabled
                                 title="Self / Protected Platform - Cannot delete own container via UI"
                                 className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/30 text-zinc-400 dark:text-zinc-600 cursor-not-allowed border border-zinc-200 dark:border-zinc-800"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (!isAdmin && c.isProtected) ? (
+                              <button
+                                disabled
+                                title="Protected Container - Cannot be deleted by non-admins"
+                                className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500/50 cursor-not-allowed border border-amber-500/20"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -610,6 +700,36 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                               </button>
                             )
                           )}
+
+                          {/* Admin Quick Governance Toggles */}
+                          {isAdmin && !c.isSelf && (
+                            <div className="flex items-center space-x-1 pl-1.5 border-l border-zinc-200 dark:border-zinc-800">
+                              <button
+                                onClick={() => handleToggleFlag(c.id, 'isProtected', Boolean(c.isProtected))}
+                                disabled={flagLoading === `${c.id}-isProtected`}
+                                title={c.isProtected ? "Protected: Click to unprotect" : "Unprotected: Click to protect container"}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  c.isProtected
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border border-amber-500/30'
+                                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                }`}
+                              >
+                                {c.isProtected ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                              </button>
+                              <button
+                                onClick={() => handleToggleFlag(c.id, 'isHidden', Boolean(c.isHidden))}
+                                disabled={flagLoading === `${c.id}-isHidden`}
+                                title={c.isHidden ? "Hidden from operators/viewers: Click to unhide" : "Visible: Click to hide container"}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  c.isHidden
+                                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/30'
+                                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+                                }`}
+                              >
+                                {c.isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -622,9 +742,51 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
       </div>
 
       {/* Container Details Modal / Tabbed Drawer */}
-      {activeContainer && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-5xl w-full h-[95vh] sm:h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors overflow-hidden">
+      {activeContainer && isDetailMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Box className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <p className="font-bold text-zinc-900 dark:text-white truncate max-w-[150px]">{activeContainer.name}</p>
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
+                  {activeContainer.state}
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400 capitalize">{detailTab}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsDetailMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setActiveContainer(null);
+                setIsDetailMinimized(false);
+                setIsDetailMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {activeContainer && !isDetailMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden ${
+            isDetailMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-5xl w-full h-[95vh] sm:h-[90vh]'
+          }`}>
             {/* Modal Header */}
             <div className="p-4 sm:px-6 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div className="flex items-center justify-between w-full lg:w-auto">
@@ -643,6 +805,18 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                           <span>Self</span>
                         </span>
                       )}
+                      {activeContainer.isProtected && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1">
+                          <Lock className="w-3 h-3" />
+                          <span>Protected</span>
+                        </span>
+                      )}
+                      {activeContainer.isHidden && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1">
+                          <EyeOff className="w-3 h-3" />
+                          <span>Hidden</span>
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStateBadge(activeContainer.state)}`}>
                         {activeContainer.state}
                       </span>
@@ -651,16 +825,37 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setActiveContainer(null)}
-                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg lg:hidden"
-                  aria-label="Close modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                {/* Mobile controls */}
+                <div className="flex items-center space-x-1 lg:hidden">
+                  <button
+                    onClick={() => setIsDetailMinimized(true)}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                    title="Minimize"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setIsDetailMaximized(!isDetailMaximized)}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                    title={isDetailMaximized ? "Restore" : "Maximize"}
+                  >
+                    {isDetailMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveContainer(null);
+                      setIsDetailMinimized(false);
+                      setIsDetailMaximized(false);
+                    }}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
+                    aria-label="Close modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
-              {/* Tabs Switcher & Close button */}
+              {/* Tabs Switcher & Window controls */}
               <div className="flex items-center justify-between lg:justify-end space-x-2 w-full lg:w-auto">
                 <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold overflow-x-auto max-w-full">
                   <button
@@ -707,15 +902,51 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   >
                     Inspect
                   </button>
+                  {isOperator && !activeContainer.isSelf && (
+                    <button
+                      onClick={() => {
+                        setScaleTarget(activeContainer);
+                        setIsScaleModalOpen(true);
+                      }}
+                      className="px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 transition-all font-semibold flex items-center space-x-1"
+                      title="Scale container replicas & configure autoscaling"
+                    >
+                      <Boxes className="w-3.5 h-3.5" />
+                      <span>Scale</span>
+                    </button>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => setActiveContainer(null)}
-                  className="hidden lg:block text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1.5 rounded-lg"
-                  aria-label="Close modal"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                {/* Desktop Window Controls (Minimize, Maximize, Close) */}
+                <div className="hidden lg:flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+                  <button
+                    onClick={() => setIsDetailMinimized(true)}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    title="Minimize"
+                    aria-label="Minimize modal"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setIsDetailMaximized(!isDetailMaximized)}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    title={isDetailMaximized ? "Restore" : "Maximize"}
+                    aria-label={isDetailMaximized ? "Restore modal" : "Maximize modal"}
+                  >
+                    {isDetailMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveContainer(null);
+                      setIsDetailMinimized(false);
+                      setIsDetailMaximized(false);
+                    }}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    aria-label="Close modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -742,6 +973,91 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                     <div>
                       <span className="text-zinc-500 font-semibold uppercase">Command</span>
                       <div className="font-mono text-zinc-800 dark:text-zinc-200 mt-1 truncate">{activeContainer.command}</div>
+                    </div>
+                  </div>
+
+                  {/* Governance & Protection Card */}
+                  <div className="p-4 bg-zinc-50/80 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-4 h-4 text-blue-500" />
+                        <h4 className="font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider text-[11px]">
+                          Access Control & Container Governance
+                        </h4>
+                      </div>
+                      {isAdmin && (
+                        <span className="text-[10px] text-zinc-500 font-mono">Administrator Privileges</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {/* Protection Card */}
+                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                        <div className="space-y-0.5 pr-2">
+                          <div className="flex items-center space-x-1.5">
+                            <Lock className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="font-bold text-zinc-900 dark:text-white">Protected Container</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Prevents operators and viewers from stopping, restarting, or deleting this container.
+                          </p>
+                        </div>
+                        {isAdmin && !activeContainer.isSelf ? (
+                          <button
+                            onClick={() => handleToggleFlag(activeContainer.id, 'isProtected', Boolean(activeContainer.isProtected))}
+                            disabled={flagLoading === `${activeContainer.id}-isProtected`}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors shrink-0 ${
+                              activeContainer.isProtected
+                                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
+                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                            }`}
+                          >
+                            {activeContainer.isProtected ? 'Protected' : 'Unprotected'}
+                          </button>
+                        ) : (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            activeContainer.isProtected || activeContainer.isSelf
+                              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                          }`}>
+                            {activeContainer.isProtected || activeContainer.isSelf ? 'Protected' : 'Standard'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Hidden Card */}
+                      <div className="p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                        <div className="space-y-0.5 pr-2">
+                          <div className="flex items-center space-x-1.5">
+                            <EyeOff className="w-3.5 h-3.5 text-purple-500" />
+                            <span className="font-bold text-zinc-900 dark:text-white">Hidden Visibility</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Conceals this container from operator and viewer user dashboards entirely.
+                          </p>
+                        </div>
+                        {isAdmin && !activeContainer.isSelf ? (
+                          <button
+                            onClick={() => handleToggleFlag(activeContainer.id, 'isHidden', Boolean(activeContainer.isHidden))}
+                            disabled={flagLoading === `${activeContainer.id}-isHidden`}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors shrink-0 ${
+                              activeContainer.isHidden
+                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
+                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                            }`}
+                          >
+                            {activeContainer.isHidden ? 'Hidden' : 'Visible'}
+                          </button>
+                        ) : (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            activeContainer.isHidden || activeContainer.isSelf
+                              ? 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'
+                          }`}>
+                            {activeContainer.isHidden || activeContainer.isSelf ? 'Hidden' : 'Visible'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -784,32 +1100,115 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Interactive Trivy Security Report Modal */}
-      {selectedReportId && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative animate-in fade-in zoom-in-95 transition-colors">
-            <div className="flex justify-end pb-2">
-              <button
-                onClick={() => setSelectedReportId(null)}
-                className="p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
-                title="Close report viewer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* Interactive Security Report Modal */}
+      {selectedReportId && isReportMinimized && createPortal(
+        <div className="fixed bottom-5 left-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white truncate max-w-[150px]">Security Report</p>
+              <p className="text-[10px] text-zinc-400 font-mono">{selectedReportId.substring(0, 8)}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsReportMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore report"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setSelectedReportId(null);
+                setIsReportMinimized(false);
+                setIsReportMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {selectedReportId && !isReportMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 shadow-2xl relative animate-in fade-in zoom-in-95 transition-all flex flex-col ${
+            isReportMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-y-auto'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 mb-4">
+              <div className="flex items-center space-x-2">
+                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Vulnerability Security Report</h3>
+              </div>
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => setIsReportMinimized(true)}
+                  className="p-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  title="Minimize report"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setIsReportMaximized(!isReportMaximized)}
+                  className="p-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  title={isReportMaximized ? "Restore size" : "Maximize report"}
+                >
+                  {isReportMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedReportId(null);
+                    setIsReportMinimized(false);
+                    setIsReportMaximized(false);
+                  }}
+                  className="p-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  title="Close report viewer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <ReportViewer
               reportId={selectedReportId}
-              onClose={() => setSelectedReportId(null)}
+              onClose={() => {
+                setSelectedReportId(null);
+                setIsReportMinimized(false);
+                setIsReportMaximized(false);
+              }}
               onDeleted={() => {
                 setSelectedReportId(null);
+                setIsReportMinimized(false);
+                setIsReportMaximized(false);
                 onRefresh();
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Scale & Autoscaling Modal */}
+      {scaleTarget && (
+        <ScaleModal
+          isOpen={isScaleModalOpen}
+          onClose={() => {
+            setIsScaleModalOpen(false);
+            setScaleTarget(null);
+          }}
+          containerId={scaleTarget.id}
+          containerName={scaleTarget.name}
+          onScaled={onRefresh}
+        />
       )}
     </div>
   );

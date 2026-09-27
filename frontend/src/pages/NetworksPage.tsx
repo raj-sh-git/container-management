@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DockerNetwork, Container } from '../types';
 import { networksApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Network, Plus, Trash2, Search, RefreshCw, X, Link, Unlink, Eye } from 'lucide-react';
+import { Network, Plus, Trash2, Search, RefreshCw, X, Link, Unlink, Eye, ShieldCheck } from 'lucide-react';
 
 interface NetworksPageProps {
   networks: DockerNetwork[];
@@ -76,7 +76,7 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Virtual Networks</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Container Virtual Networks</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Manage subnets, bridge/overlay drivers & container connections</p>
         </div>
 
@@ -144,7 +144,17 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
                 const containerCount = n.Containers ? Object.keys(n.Containers).length : 0;
                 return (
                   <tr key={id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">{n.Name}</td>
+                    <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">
+                      <div className="flex items-center space-x-2">
+                        <span>{n.Name}</span>
+                        {n.isSelf && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform Virtual Network">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>Self</span>
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
                       <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
                         {n.Driver}
@@ -201,7 +211,7 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        {isOperator && !['bridge', 'host', 'none'].includes(n.Name) && (
+                        {isOperator && !['bridge', 'host', 'none'].includes(n.Name) && !n.isSelf && (
                           <button
                             onClick={() => handleDelete(id, n.Name)}
                             title="Delete Network"

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Container, DockerImage } from '../../types';
 import { securityApi } from '../../services/api';
-import { ShieldAlert, X, Play, Loader2 } from 'lucide-react';
+import { ShieldAlert, X, Play, Loader2, Minus, Maximize2, Minimize2 } from 'lucide-react';
 
 interface ScanModalProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ export const ScanModal: React.FC<ScanModalProps> = ({
   onScanInitiated,
   initialTarget,
 }) => {
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [targetType, setTargetType] = useState<'image' | 'container'>(
     initialTarget?.type || 'image'
   );
@@ -61,9 +64,48 @@ export const ScanModal: React.FC<ScanModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 transition-colors">
+  if (isMinimized) {
+    return createPortal(
+      <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+        <div className="flex items-center space-x-2">
+          <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+            <ShieldAlert className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900 dark:text-white">Security Scan</p>
+            <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">{selectedTarget || 'Select target'}</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Restore window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              setIsMinimized(false);
+              setIsMaximized(false);
+              onClose();
+            }}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+        isMaximized ? 'w-full h-full inset-0 rounded-none max-w-none' : 'rounded-2xl max-w-lg w-full'
+      }`}>
         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20">
@@ -74,9 +116,33 @@ export const ScanModal: React.FC<ScanModalProps> = ({
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Scan for CVEs, packages & configurations</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title={isMaximized ? "Restore size" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => {
+                setIsMinimized(false);
+                setIsMaximized(false);
+                onClose();
+              }}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -103,7 +169,7 @@ export const ScanModal: React.FC<ScanModalProps> = ({
                     : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-white'
                 }`}
               >
-                Docker Image
+                Container Image
               </button>
               <button
                 type="button"
@@ -172,6 +238,7 @@ export const ScanModal: React.FC<ScanModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

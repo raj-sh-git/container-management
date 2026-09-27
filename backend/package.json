@@ -1,7 +1,7 @@
 {
   "name": "container-management-backend",
-  "version": "0.2.0",
-  "description": "Backend for Docker Container Management Platform with Socket, WebSockets & Security Scanner",
+  "version": "0.3.0",
+  "description": "Backend for Container Management Platform with Socket, WebSockets & Security Scanner",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",

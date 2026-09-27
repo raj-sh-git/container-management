@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
           <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-500/20 mb-2">
             <Server className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Docker Control Center</h1>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">Container Manager</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Enterprise container management, interactive terminal & Trivy security
           </p>

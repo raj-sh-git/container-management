@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DockerVolume } from '../types';
 import { volumesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { HardDrive, Plus, Trash2, Search, RefreshCw, X, Eye } from 'lucide-react';
+import { HardDrive, Plus, Trash2, Search, RefreshCw, X, Eye, ShieldCheck } from 'lucide-react';
 
 interface VolumesPageProps {
   volumes: DockerVolume[];
@@ -48,7 +48,7 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Persistent Volumes</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Persistent Storage Volumes</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Manage data volumes and local storage drivers</p>
         </div>
 
@@ -112,7 +112,17 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
             ) : (
               filtered.map((v) => (
                 <tr key={v.Name} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">{v.Name}</td>
+                  <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">
+                    <div className="flex items-center space-x-2">
+                      <span>{v.Name}</span>
+                      {v.isSelf && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform Storage Volume">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>Self</span>
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">{v.Driver}</td>
                   <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-sm truncate" title={v.Mountpoint}>
                     {v.Mountpoint}
@@ -130,7 +140,7 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
-                      {isOperator && (
+                      {isOperator && !v.isSelf && (
                         <button
                           onClick={() => handleDelete(v.Name)}
                           title="Delete Volume"

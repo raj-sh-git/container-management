@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ComposeStack, Container } from '../types';
 import { containersApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { ScaleModal } from '../components/containers/ScaleModal';
 import {
   Boxes,
   Play,
@@ -31,6 +32,7 @@ export const StacksPage: React.FC<StacksPageProps> = ({
   const { isOperator } = useAuth();
   const [expandedStacks, setExpandedStacks] = useState<Record<string, boolean>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [scaleTarget, setScaleTarget] = useState<Container | null>(null);
 
   const toggleStack = (name: string) => {
     setExpandedStacks((prev) => ({
@@ -77,7 +79,7 @@ export const StacksPage: React.FC<StacksPageProps> = ({
             </div>
             <div>
               <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-                Docker Compose Stacks
+                Compose Stacks
               </h1>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Multi-container environments grouped by Compose project & stack definitions
@@ -239,6 +241,15 @@ export const StacksPage: React.FC<StacksPageProps> = ({
                             </td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex items-center justify-end space-x-2">
+                                {isOperator && !c.isSelf && (
+                                  <button
+                                    onClick={() => setScaleTarget(c)}
+                                    title="Scale Replicas / Autoscaling"
+                                    className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-500/20 text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 transition-colors"
+                                  >
+                                    <Boxes className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 {c.state === 'running' && isOperator && (
                                   <button
                                     onClick={() => onSelectContainer(c, 'terminal')}
@@ -267,6 +278,17 @@ export const StacksPage: React.FC<StacksPageProps> = ({
             );
           })}
         </div>
+      )}
+
+      {/* Scale & Autoscaling Modal */}
+      {scaleTarget && (
+        <ScaleModal
+          isOpen={!!scaleTarget}
+          onClose={() => setScaleTarget(null)}
+          containerId={scaleTarget.id}
+          containerName={scaleTarget.name}
+          onScaled={onRefresh}
+        />
       )}
     </div>
   );

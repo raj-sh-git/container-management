@@ -72,3 +72,33 @@ export const cleanupSchedules = sqliteTable('cleanup_schedules', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const scalingPolicies = sqliteTable('scaling_policies', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  targetType: text('target_type', { enum: ['container', 'stack'] }).notNull().default('container'),
+  targetId: text('target_id').notNull(), // container name or service name
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  minReplicas: integer('min_replicas').notNull().default(1),
+  maxReplicas: integer('max_replicas').notNull().default(3),
+  currentReplicas: integer('current_replicas').notNull().default(1),
+  cpuThreshold: integer('cpu_threshold').notNull().default(80), // % CPU (e.g. 80)
+  memoryThreshold: integer('memory_threshold').notNull().default(85), // % Memory (e.g. 85)
+  cooldownSeconds: integer('cooldown_seconds').notNull().default(60), // cooldown in seconds
+  lastScaleAt: text('last_scale_at'),
+  lastScaleAction: text('last_scale_action'), // 'SCALE_UP', 'SCALE_DOWN', 'MANUAL'
+  lastScaleReason: text('last_scale_reason'),
+  createdBy: text('created_by'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const containerFlags = sqliteTable('container_flags', {
+  containerId: text('container_id').primaryKey(),
+  containerName: text('container_name'),
+  isHidden: integer('is_hidden', { mode: 'boolean' }).notNull().default(false),
+  isProtected: integer('is_protected', { mode: 'boolean' }).notNull().default(false),
+  updatedAt: text('updated_at').notNull(),
+  updatedBy: text('updated_by'),
+});
+
+

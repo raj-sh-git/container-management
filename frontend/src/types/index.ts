@@ -52,6 +52,8 @@ export interface Container {
   }>;
   networkMode: string;
   isSelf?: boolean;
+  isHidden?: boolean;
+  isProtected?: boolean;
   composeProject?: string;
   composeService?: string;
 }
@@ -92,6 +94,7 @@ export interface DockerVolume {
     Size: number;
     RefCount: number;
   };
+  isSelf?: boolean;
 }
 
 export interface DockerNetwork {
@@ -103,6 +106,7 @@ export interface DockerNetwork {
   EnableIPv6: boolean;
   Internal: boolean;
   Attachable: boolean;
+  isSelf?: boolean;
   IPAM?: {
     Driver: string;
     Config: Array<{
@@ -213,4 +217,68 @@ export interface ChangelogItem {
   title: string;
   changes: string[];
 }
+
+export interface ScalingReplica {
+  id: string;
+  name: string;
+  state: string;
+  status: string;
+  created: number;
+}
+
+export interface ScalingInfo {
+  baseName: string;
+  primaryId: string;
+  currentReplicas: number;
+  replicas: ScalingReplica[];
+  hasHostPortConflict: boolean;
+  ports: Array<{ hostPort?: string; containerPort: string }>;
+  networks: string[];
+  isComposeService: boolean;
+  composeProject?: string;
+  composeService?: string;
+  eligible: boolean;
+  strategy: 'direct' | 'internal_network';
+  reason: string;
+  resources?: {
+    memoryLimitMB?: number;
+    memoryReservationMB?: number;
+    nanoCpus?: number;
+    cpuShares?: number;
+  };
+  policy: ScalingPolicy | null;
+}
+
+export interface ScalingPolicy {
+  id: string;
+  name: string;
+  targetType: 'container' | 'stack';
+  targetId: string;
+  enabled: boolean;
+  minReplicas: number;
+  maxReplicas: number;
+  currentReplicas: number;
+  cpuThreshold: number;
+  memoryThreshold: number;
+  cooldownSeconds: number;
+  lastScaleAt?: string | null;
+  lastScaleAction?: string | null;
+  lastScaleReason?: string | null;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateScalingPolicyInput {
+  name: string;
+  targetType?: 'container' | 'stack';
+  targetId: string;
+  enabled?: boolean;
+  minReplicas: number;
+  maxReplicas: number;
+  cpuThreshold: number;
+  memoryThreshold: number;
+  cooldownSeconds: number;
+}
+
 

@@ -75,11 +75,18 @@ export class DockerService {
   async systemPrune(options: { all?: boolean; volumes?: boolean } = {}) {
     const results: any = {};
     results.containers = await this.docker.pruneContainers();
-    results.images = await this.docker.pruneImages({ filters: options.all ? {} : { dangling: { true: true } } });
+    // In Docker API: dangling: false prunes ALL unused images (not just dangling ones)
+    results.images = await this.docker.pruneImages({
+      filters: options.all ? { dangling: { false: true } } : { dangling: { true: true } },
+    });
     results.networks = await this.docker.pruneNetworks();
     if (options.volumes) {
       results.volumes = await this.docker.pruneVolumes();
     }
+    results.totalSpaceReclaimed =
+      (results.containers?.SpaceReclaimed || 0) +
+      (results.images?.SpaceReclaimed || 0) +
+      (results.volumes?.SpaceReclaimed || 0);
     return results;
   }
 
@@ -128,7 +135,10 @@ export class DockerService {
     // 2. Images
     if (options.cleanImages) {
       try {
-        const filterOpt = options.cleanImagesMode === 'dangling' ? { dangling: { true: true } } : {};
+        // Docker API: dangling: false prunes ALL unused images. Empty filters {} defaults to dangling: true!
+        const filterOpt = options.cleanImagesMode === 'dangling'
+          ? { dangling: { true: true } }
+          : { dangling: { false: true } };
         const imgRes = await this.docker.pruneImages({ filters: filterOpt });
         if (imgRes) {
           results.imagesDeleted = imgRes.ImagesDeleted || [];
@@ -308,7 +318,7 @@ export class DockerService {
   async stopContainer(id: string, timeout: number = 10, allowSelf: boolean = false) {
     const inspect = await this.docker.getContainer(id).inspect();
     if (!allowSelf && this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
-      throw new Error('Cannot stop the Container Control Center platform itself to avoid service disruption.');
+      throw new Error('Cannot stop the Container Manager platform itself to avoid service disruption.');
     }
     const container = this.docker.getContainer(id);
     await container.stop({ t: timeout });
@@ -318,7 +328,7 @@ export class DockerService {
   async restartContainer(id: string, timeout: number = 10, allowSelf: boolean = false) {
     const inspect = await this.docker.getContainer(id).inspect();
     if (!allowSelf && this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
-      throw new Error('Cannot restart the Container Control Center platform itself to avoid service disruption.');
+      throw new Error('Cannot restart the Container Manager platform itself to avoid service disruption.');
     }
     const container = this.docker.getContainer(id);
     await container.restart({ t: timeout });
@@ -328,7 +338,7 @@ export class DockerService {
   async pauseContainer(id: string, allowSelf: boolean = false) {
     const inspect = await this.docker.getContainer(id).inspect();
     if (!allowSelf && this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
-      throw new Error('Cannot pause the Container Control Center platform itself.');
+      throw new Error('Cannot pause the Container Manager platform itself.');
     }
     const container = this.docker.getContainer(id);
     await container.pause();
@@ -344,7 +354,7 @@ export class DockerService {
   async killContainer(id: string, allowSelf: boolean = false) {
     const inspect = await this.docker.getContainer(id).inspect();
     if (!allowSelf && this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
-      throw new Error('Cannot kill the Container Control Center platform itself.');
+      throw new Error('Cannot kill the Container Manager platform itself.');
     }
     const container = this.docker.getContainer(id);
     await container.kill();
@@ -354,7 +364,7 @@ export class DockerService {
   async removeContainer(id: string, force: boolean = false, removeVolumes: boolean = false, allowSelf: boolean = false) {
     const inspect = await this.docker.getContainer(id).inspect();
     if (!allowSelf && this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
-      throw new Error('Cannot remove the Container Control Center platform itself.');
+      throw new Error('Cannot remove the Container Manager platform itself.');
     }
     const container = this.docker.getContainer(id);
     await container.remove({ force, v: removeVolumes });
@@ -442,7 +452,7 @@ export class DockerService {
     const containers = await this.listContainers(true);
     const hasSelf = containers.some((c) => c.composeProject === stackName && c.isSelf);
     if (hasSelf) {
-      throw new Error(`Cannot stop the Compose stack '${stackName}' containing the Container Control Center platform itself to avoid service disruption.`);
+      throw new Error(`Cannot stop the Compose stack '${stackName}' containing the Container Manager platform itself to avoid service disruption.`);
     }
 
     const stackContainers = containers.filter((c) => c.composeProject === stackName && !c.isSelf);
@@ -464,7 +474,7 @@ export class DockerService {
     const containers = await this.listContainers(true);
     const hasSelf = containers.some((c) => c.composeProject === stackName && c.isSelf);
     if (hasSelf) {
-      throw new Error(`Cannot restart the Compose stack '${stackName}' containing the Container Control Center platform itself to avoid service disruption.`);
+      throw new Error(`Cannot restart the Compose stack '${stackName}' containing the Container Manager platform itself to avoid service disruption.`);
     }
 
     const stackContainers = containers.filter((c) => c.composeProject === stackName && !c.isSelf);
@@ -478,6 +488,278 @@ export class DockerService {
       }
     }
     return results;
+  }
+
+  // ==================== SCALING & REPLICAS ====================
+  async getScalingEligibility(idOrName: string) {
+    const inspect = await this.docker.getContainer(idOrName).inspect();
+    const rawName = inspect.Name.replace(/^\//, '');
+    const baseName = rawName.replace(/-replica-\d+$/, '');
+
+    // List all containers to find active replicas
+    const allContainers = await this.listContainers(true);
+    const replicas = allContainers.filter((c) => {
+      const cName = c.name.replace(/^\//, '');
+      const isNamedReplica = cName === baseName || new RegExp(`^${baseName}-replica-\\d+$`).test(cName);
+      const isLabeledReplica = c.labels?.['com.docker-control.replica-of'] === baseName;
+      return isNamedReplica || isLabeledReplica;
+    });
+
+    const portBindings = inspect.HostConfig?.PortBindings || {};
+    const ports: Array<{ hostPort?: string; containerPort: string }> = [];
+    let hasHostPortConflict = false;
+
+    for (const [containerPort, bindings] of Object.entries(portBindings)) {
+      if (Array.isArray(bindings) && bindings.length > 0) {
+        for (const b of bindings) {
+          if (b.HostPort) {
+            hasHostPortConflict = true;
+            ports.push({ hostPort: b.HostPort, containerPort });
+          } else {
+            ports.push({ containerPort });
+          }
+        }
+      } else {
+        ports.push({ containerPort });
+      }
+    }
+
+    const networks = Object.keys(inspect.NetworkSettings?.Networks || {});
+    const isComposeService = Boolean(inspect.Config?.Labels?.['com.docker.compose.service']);
+    const composeProject = inspect.Config?.Labels?.['com.docker.compose.project'];
+    const composeService = inspect.Config?.Labels?.['com.docker.compose.service'];
+
+    let reason = 'Eligible for horizontal scaling.';
+    let strategy: 'direct' | 'internal_network' = 'direct';
+
+    if (hasHostPortConflict) {
+      strategy = 'internal_network';
+      reason = `Container binds host port(s) [${ports.map((p) => p.hostPort).filter(Boolean).join(', ')}]. Additional replicas will run on the internal Docker network (${networks.join(', ') || 'bridge'}) without host port bindings to prevent port collision, ideal for reverse proxy routing.`;
+    }
+
+    return {
+      baseName,
+      primaryId: inspect.Id,
+      currentReplicas: Math.max(1, replicas.length),
+      replicas: replicas.map((r) => ({
+        id: r.id,
+        name: r.name,
+        state: r.state,
+        status: r.status,
+        created: r.created,
+      })),
+      hasHostPortConflict,
+      ports,
+      networks,
+      isComposeService,
+      composeProject,
+      composeService,
+      eligible: true,
+      strategy,
+      reason,
+      resources: {
+        memoryLimitMB: inspect.HostConfig?.Memory ? Math.round(inspect.HostConfig.Memory / (1024 * 1024)) : undefined,
+        memoryReservationMB: inspect.HostConfig?.MemoryReservation ? Math.round(inspect.HostConfig.MemoryReservation / (1024 * 1024)) : undefined,
+        nanoCpus: inspect.HostConfig?.NanoCpus,
+        cpuShares: inspect.HostConfig?.CpuShares,
+      },
+    };
+  }
+
+  async scaleContainer(idOrName: string, targetReplicas: number) {
+    if (targetReplicas < 1 || targetReplicas > 20) {
+      throw new Error('Target replicas must be between 1 and 20.');
+    }
+
+    const inspect = await this.docker.getContainer(idOrName).inspect();
+    const rawName = inspect.Name.replace(/^\//, '');
+    const baseName = rawName.replace(/-replica-\d+$/, '');
+
+    // Never scale the container manager itself
+    if (this.isSelfContainer({ Id: inspect.Id, Names: [inspect.Name] })) {
+      throw new Error('Cannot scale the Container Manager platform itself.');
+    }
+
+    // Find all existing replicas for this baseName
+    const allContainers = await this.listContainers(true);
+    const existingReplicas = allContainers.filter((c) => {
+      const cName = c.name.replace(/^\//, '');
+      return (
+        cName !== baseName &&
+        (new RegExp(`^${baseName}-replica-\\d+$`).test(cName) ||
+          c.labels?.['com.docker-control.replica-of'] === baseName)
+      );
+    });
+
+    const currentTotal = 1 + existingReplicas.length; // 1 primary + replicas
+
+    if (targetReplicas > currentTotal) {
+      // Scale UP
+      const toAdd = targetReplicas - currentTotal;
+      const createdNames: string[] = [];
+
+      // Find highest index currently used
+      let maxIndex = 0;
+      for (const r of existingReplicas) {
+        const match = r.name.match(new RegExp(`^/?${baseName}-replica-(\\d+)$`));
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxIndex) maxIndex = num;
+        }
+      }
+
+      for (let i = 1; i <= toAdd; i++) {
+        const newIndex = maxIndex + i;
+        const replicaName = `${baseName}-replica-${newIndex}`;
+
+        const networks = inspect.NetworkSettings?.Networks || {};
+        const networkNames = Object.keys(networks);
+        const composeService = inspect.Config?.Labels?.['com.docker.compose.service'];
+        const networkAliases = Array.from(new Set([baseName, composeService].filter(Boolean) as string[]));
+
+        const endpointsConfig: Record<string, any> = {};
+        for (const netName of networkNames) {
+          if (netName !== 'bridge' && netName !== 'host' && netName !== 'none') {
+            endpointsConfig[netName] = {
+              Aliases: networkAliases,
+            };
+          }
+        }
+
+        const cloneConfig: any = {
+          name: replicaName,
+          Image: inspect.Config.Image,
+          Env: inspect.Config.Env,
+          Cmd: inspect.Config.Cmd,
+          Entrypoint: inspect.Config.Entrypoint,
+          WorkingDir: inspect.Config.WorkingDir,
+          Labels: {
+            ...(inspect.Config.Labels || {}),
+            'com.docker-control.replica-of': baseName,
+            'com.docker-control.replica-index': String(newIndex),
+          },
+          HostConfig: {
+            Memory: inspect.HostConfig.Memory,
+            MemoryReservation: inspect.HostConfig.MemoryReservation,
+            CpuShares: inspect.HostConfig.CpuShares,
+            NanoCpus: inspect.HostConfig.NanoCpus,
+            Binds: inspect.HostConfig.Binds,
+            RestartPolicy: inspect.HostConfig.RestartPolicy,
+            // Strip host port bindings to prevent host port collision!
+            PortBindings: {},
+            NetworkMode: inspect.HostConfig.NetworkMode,
+          },
+          ...(Object.keys(endpointsConfig).length > 0
+            ? { NetworkingConfig: { EndpointsConfig: endpointsConfig } }
+            : {}),
+        };
+
+        const newContainer = await this.docker.createContainer(cloneConfig);
+
+        // Connect to any additional networks not included in creation config
+        for (const netName of networkNames) {
+          if (netName !== 'bridge' && netName !== 'host' && netName !== 'none' && !endpointsConfig[netName]) {
+            try {
+              const net = this.docker.getNetwork(netName);
+              await net.connect({
+                Container: newContainer.id,
+                EndpointConfig: {
+                  Aliases: networkAliases,
+                },
+              });
+            } catch {}
+          }
+        }
+
+        await newContainer.start();
+        createdNames.push(replicaName);
+      }
+
+      return {
+        success: true,
+        baseName,
+        action: 'scaled_up',
+        previousReplicas: currentTotal,
+        currentReplicas: targetReplicas,
+        created: createdNames,
+      };
+    } else if (targetReplicas < currentTotal) {
+      // Scale DOWN
+      const toRemoveCount = currentTotal - targetReplicas;
+
+      // Sort existing replicas by index descending so we remove newest first
+      existingReplicas.sort((a, b) => {
+        const aMatch = a.name.match(/-replica-(\d+)$/);
+        const bMatch = b.name.match(/-replica-(\d+)$/);
+        const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
+        const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
+        return bNum - aNum;
+      });
+
+      const removedNames: string[] = [];
+      const toRemove = existingReplicas.slice(0, toRemoveCount);
+
+      for (const r of toRemove) {
+        try {
+          const container = this.docker.getContainer(r.id);
+          await container.stop({ t: 10 }).catch(() => {});
+          await container.remove({ force: true }).catch(() => {});
+          removedNames.push(r.name);
+        } catch (err: any) {
+          console.error(`Failed to stop/remove replica ${r.name}:`, err.message);
+        }
+      }
+
+      return {
+        success: true,
+        baseName,
+        action: 'scaled_down',
+        previousReplicas: currentTotal,
+        currentReplicas: targetReplicas,
+        removed: removedNames,
+      };
+    }
+
+    return {
+      success: true,
+      baseName,
+      action: 'no_change',
+      currentReplicas: currentTotal,
+    };
+  }
+
+  async getContainerMetricsQuick(containerId: string): Promise<{ cpuPercent: number; memPercent: number }> {
+    try {
+      const container = this.docker.getContainer(containerId);
+      const stats = await container.stats({ stream: false });
+      if (!stats || !stats.cpu_stats) {
+        return { cpuPercent: 0, memPercent: 0 };
+      }
+
+      // Calculate CPU percent
+      let cpuPercent = 0.0;
+      const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - (stats.precpu_stats?.cpu_usage?.total_usage || 0);
+      const systemDelta = (stats.cpu_stats.system_cpu_usage || 0) - (stats.precpu_stats?.system_cpu_usage || 0);
+      const onlineCpus = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage?.percpu_usage?.length || 1;
+
+      if (systemDelta > 0.0 && cpuDelta > 0.0) {
+        cpuPercent = (cpuDelta / systemDelta) * onlineCpus * 100.0;
+      }
+
+      // Calculate Memory percent
+      let memPercent = 0.0;
+      if (stats.memory_stats && stats.memory_stats.limit > 0) {
+        const usage = stats.memory_stats.usage - (stats.memory_stats.stats?.cache || 0);
+        memPercent = (usage / stats.memory_stats.limit) * 100.0;
+      }
+
+      return {
+        cpuPercent: Math.round(cpuPercent * 10) / 10,
+        memPercent: Math.round(memPercent * 10) / 10,
+      };
+    } catch {
+      return { cpuPercent: 0, memPercent: 0 };
+    }
   }
 
   // ==================== IMAGES ====================
@@ -575,10 +857,64 @@ export class DockerService {
     return { success: true, message: `Tagged image as ${repo}:${tag}` };
   }
 
+  async getSelfResourceInfo(): Promise<{ networks: Set<string>; volumes: Set<string>; containerIds: Set<string> }> {
+    const networks = new Set<string>();
+    const volumes = new Set<string>();
+    const containerIds = new Set<string>();
+
+    try {
+      const allContainers = await this.docker.listContainers({ all: true });
+      for (const c of allContainers) {
+        if (this.isSelfContainer(c)) {
+          containerIds.add(c.Id);
+          containerIds.add(c.Id.substring(0, 12));
+          if (c.NetworkSettings?.Networks) {
+            for (const netName of Object.keys(c.NetworkSettings.Networks)) {
+              if (netName !== 'bridge' && netName !== 'host' && netName !== 'none') {
+                networks.add(netName);
+              }
+            }
+          }
+          if (c.Mounts) {
+            for (const m of c.Mounts) {
+              if (m.Type === 'volume' && m.Name) {
+                volumes.add(m.Name);
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+
+    networks.add('container-management_default');
+    networks.add('container-manager_default');
+    volumes.add('container-management_data');
+    volumes.add('container-manager_data');
+
+    return { networks, volumes, containerIds };
+  }
+
   // ==================== VOLUMES ====================
   async listVolumes() {
-    const res = await this.docker.listVolumes();
-    return res.Volumes || [];
+    const [res, selfInfo] = await Promise.all([
+      this.docker.listVolumes(),
+      this.getSelfResourceInfo().catch(() => ({
+        networks: new Set<string>(),
+        volumes: new Set<string>(),
+        containerIds: new Set<string>(),
+      })),
+    ]);
+    const volumes = res.Volumes || [];
+    return volumes.map((v) => {
+      const isSelf =
+        selfInfo.volumes.has(v.Name) ||
+        v.Name.toLowerCase().includes('container-management') ||
+        v.Name.toLowerCase().includes('container-manager');
+      return {
+        ...v,
+        isSelf,
+      };
+    });
   }
 
   async inspectVolume(name: string) {
@@ -601,7 +937,24 @@ export class DockerService {
 
   // ==================== NETWORKS ====================
   async listNetworks() {
-    return await this.docker.listNetworks();
+    const [nets, selfInfo] = await Promise.all([
+      this.docker.listNetworks(),
+      this.getSelfResourceInfo().catch(() => ({
+        networks: new Set<string>(),
+        volumes: new Set<string>(),
+        containerIds: new Set<string>(),
+      })),
+    ]);
+    return nets.map((n) => {
+      const isSelf =
+        selfInfo.networks.has(n.Name) ||
+        n.Name.toLowerCase().includes('container-management') ||
+        n.Name.toLowerCase().includes('container-manager');
+      return {
+        ...n,
+        isSelf,
+      };
+    });
   }
 
   async inspectNetwork(id: string) {

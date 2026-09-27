@@ -31,6 +31,129 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   res.json(usersList);
 });
 
+// Backup / export all users (Admin only)
+router.get('/backup', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const allUsers = db.select().from(schema.users).all();
+    await logAudit(req, 'USER_BACKUP', 'system', 'users', `Exported backup of ${allUsers.length} users.`);
+    res.json({
+      platform: 'Container Manager',
+      version: '0.3.0',
+      exportedAt: new Date().toISOString(),
+      count: allUsers.length,
+      users: allUsers.map((u) => ({
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        isActive: Boolean(u.isActive),
+        mustChangePassword: Boolean(u.mustChangePassword),
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+        passwordHash: u.passwordHash,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to export user backup' });
+  }
+});
+
+// Bulk import users (Admin only)
+router.post('/bulk', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { users = [], overwrite = false } = req.body;
+
+    if (!Array.isArray(users) || users.length === 0) {
+      res.status(400).json({ error: 'Request body must contain a non-empty array of users.' });
+      return;
+    }
+
+    const createdUsers: any[] = [];
+    const skippedUsers: string[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < users.length; i++) {
+      const u = users[i];
+      const username = (u.username || '').trim();
+      const email = (u.email || '').trim() || null;
+      let role = (u.role || 'operator').toLowerCase();
+      if (!['admin', 'operator', 'viewer'].includes(role)) {
+        role = 'operator';
+      }
+
+      if (!username) {
+        errors.push(`Row ${i + 1}: Missing username.`);
+        continue;
+      }
+
+      const existing = db.select().from(schema.users).where(eq(schema.users.username, username)).get();
+      if (existing) {
+        if (!overwrite) {
+          skippedUsers.push(username);
+          continue;
+        }
+      }
+
+      let passwordHash = u.passwordHash;
+      if (!passwordHash) {
+        const rawPass = u.password || 'ChangeMe123!';
+        passwordHash = await bcrypt.hash(rawPass, 10);
+      }
+
+      const now = new Date().toISOString();
+      const userId = existing ? existing.id : crypto.randomUUID();
+      const mustChangePassword = u.mustChangePassword !== undefined ? Boolean(u.mustChangePassword) : true;
+      const isActive = u.isActive !== undefined ? Boolean(u.isActive) : true;
+
+      if (existing) {
+        db.update(schema.users)
+          .set({
+            email,
+            role: role as 'admin' | 'operator' | 'viewer',
+            passwordHash,
+            isActive,
+            mustChangePassword,
+            updatedAt: now,
+          })
+          .where(eq(schema.users.id, existing.id))
+          .run();
+        createdUsers.push({ id: existing.id, username, role, updated: true });
+      } else {
+        db.insert(schema.users).values({
+          id: userId,
+          username,
+          email,
+          passwordHash,
+          role: role as 'admin' | 'operator' | 'viewer',
+          isActive,
+          mustChangePassword,
+          createdAt: now,
+          updatedAt: now,
+        }).run();
+        createdUsers.push({ id: userId, username, role, updated: false });
+      }
+    }
+
+    await logAudit(
+      req,
+      'USER_BULK_IMPORT',
+      'user',
+      'bulk',
+      `Imported ${createdUsers.length} users, skipped ${skippedUsers.length}, errors: ${errors.length}`
+    );
+
+    res.json({
+      success: true,
+      importedCount: createdUsers.length,
+      skippedCount: skippedUsers.length,
+      skippedUsers,
+      errors,
+      users: createdUsers,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Bulk import failed' });
+  }
+});
+
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { username, email, password, role = 'operator', mustChangePassword = true } = req.body;
 

@@ -37,10 +37,52 @@ import {
   SystemInfo,
 } from './types';
 
+const VALID_TABS: NavTab[] = [
+  'dashboard',
+  'containers',
+  'stacks',
+  'images',
+  'volumes',
+  'networks',
+  'security',
+  'users',
+  'audit',
+  'host',
+];
+
+const getInitialTab = (): NavTab => {
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase() as NavTab;
+  if (VALID_TABS.includes(hash)) return hash;
+  const stored = localStorage.getItem('activeTab') as NavTab;
+  if (stored && VALID_TABS.includes(stored)) return stored;
+  return 'dashboard';
+};
+
 const AppContent: React.FC = () => {
   const { user, loading: authLoading, isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [activeTab, setActiveTabState] = useState<NavTab>(getInitialTab);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  const setActiveTab = (tab: NavTab) => {
+    setActiveTabState(tab);
+    window.location.hash = tab;
+    localStorage.setItem('activeTab', tab);
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase() as NavTab;
+      if (VALID_TABS.includes(hash)) {
+        setActiveTabState(hash);
+        localStorage.setItem('activeTab', hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    if (!window.location.hash && activeTab) {
+      window.location.hash = activeTab;
+    }
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Core Docker data state
   const [containers, setContainers] = useState<Container[]>([]);
@@ -100,7 +142,7 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] flex items-center justify-center text-zinc-600 dark:text-zinc-400 p-4">
         <div className="flex flex-col items-center space-y-3">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-mono text-center">Initializing Container Control Center Session...</p>
+          <p className="text-xs font-mono text-center">Initializing Container Manager Session...</p>
         </div>
       </div>
     );
@@ -127,14 +169,14 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-200">
+    <div className="h-screen bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-200 overflow-hidden">
       <Navbar
         onRefresh={fetchAllData}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
 
-      <div className="flex flex-1 relative">
+      <div className="flex flex-1 relative overflow-hidden">
         <Sidebar
           activeTab={activeTab}
           isOpen={isMobileMenuOpen}
@@ -154,7 +196,7 @@ const AppContent: React.FC = () => {
           }}
         />
 
-        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto min-w-0">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto min-w-0 h-full">
           {activeTab === 'dashboard' && (
             <DashboardPage
               systemInfo={systemInfo}

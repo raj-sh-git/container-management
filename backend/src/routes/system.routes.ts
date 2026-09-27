@@ -69,6 +69,17 @@ router.get('/audit', requireAdmin, async (req: AuthenticatedRequest, res: Respon
   }
 });
 
+// Clear audit logs (Admin only)
+router.delete('/audit', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    db.delete(schema.auditLogs).run();
+    await logAudit(req, 'AUDIT_LOGS_CLEAR', 'system', 'audit', 'Permanently cleared all audit logs');
+    res.json({ success: true, message: 'Audit logs cleared successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to clear audit logs' });
+  }
+});
+
 // ==================== CLEAN-UP SCHEDULES ====================
 
 // List schedules

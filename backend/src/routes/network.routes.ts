@@ -10,7 +10,10 @@ router.use(authenticateToken);
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const networks = await dockerService.listNetworks();
-    res.json(networks);
+    const visibleNetworks = req.user?.role === 'admin'
+      ? networks
+      : networks.filter((n: any) => !n.isSelf);
+    res.json(visibleNetworks);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to list networks' });
   }

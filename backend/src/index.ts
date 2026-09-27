@@ -20,11 +20,13 @@ import volumeRoutes from './routes/volume.routes';
 import networkRoutes from './routes/network.routes';
 import securityRoutes from './routes/security.routes';
 import systemRoutes from './routes/system.routes';
+import scalingRoutes from './routes/scaling.routes';
 
 import { handleExecWs } from './websocket/exec';
 import { handleLogsWs } from './websocket/logs';
 import { handleStatsWs } from './websocket/stats';
 import { cleanupSchedulerService } from './services/cleanup-scheduler.service';
+import { autoscalerService } from './services/autoscaler.service';
 
 // Helper to match WebSocket endpoint from pathname (supports sub-paths like /cce/ws/exec or /ws/exec)
 function getWsEndpoint(pathname: string | null): 'exec' | 'logs' | 'stats' | null {
@@ -42,13 +44,16 @@ async function bootstrap() {
   // 2. Initialize Auto Clean-Up Scheduler Service
   cleanupSchedulerService.init();
 
+  // 3. Initialize Metric-driven Container Autoscaler Engine
+  autoscalerService.init();
+
   const app = express();
 
   app.set('trust proxy', true);
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json());
 
-  // 2. Register REST API Routes in an API Router
+  // 4. Register REST API Routes in an API Router
   const apiRouter = express.Router();
   apiRouter.use('/auth', authRoutes);
   apiRouter.use('/users', userRoutes);
@@ -58,6 +63,7 @@ async function bootstrap() {
   apiRouter.use('/networks', networkRoutes);
   apiRouter.use('/security', securityRoutes);
   apiRouter.use('/system', systemRoutes);
+  apiRouter.use('/scaling', scalingRoutes);
 
   // Health check endpoint
   apiRouter.get('/health', (req, res) => {

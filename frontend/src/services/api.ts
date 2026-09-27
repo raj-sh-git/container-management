@@ -14,6 +14,9 @@ import {
   RegistryAuth,
   CleanupSchedule,
   CreateCleanupScheduleInput,
+  ScalingInfo,
+  ScalingPolicy,
+  CreateScalingPolicyInput,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -86,6 +89,14 @@ export const usersApi = {
     const res = await api.delete(`/users/${id}`);
     return res.data;
   },
+  backup: async (): Promise<any> => {
+    const res = await api.get('/users/backup');
+    return res.data;
+  },
+  bulkImport: async (users: any[], overwrite: boolean = false): Promise<any> => {
+    const res = await api.post('/users/bulk', { users, overwrite });
+    return res.data;
+  },
 };
 
 // ==================== CONTAINERS & STACKS ====================
@@ -156,6 +167,10 @@ export const containersApi = {
   },
   remove: async (id: string, force: boolean = false, v: boolean = false) => {
     const res = await api.delete(`/containers/${id}`, { params: { force, v } });
+    return res.data;
+  },
+  updateFlags: async (id: string, flags: { isHidden?: boolean; isProtected?: boolean }): Promise<any> => {
+    const res = await api.patch(`/containers/${id}/flags`, flags);
     return res.data;
   },
 };
@@ -337,4 +352,40 @@ export const systemApi = {
     return res.data;
   },
 };
+
+export const scalingApi = {
+  getInfo: async (containerIdOrName: string): Promise<ScalingInfo> => {
+    const res = await api.get<ScalingInfo>(`/scaling/info/${encodeURIComponent(containerIdOrName)}`);
+    return res.data;
+  },
+  scale: async (targetId: string, targetReplicas: number): Promise<any> => {
+    const res = await api.post('/scaling/scale', { targetId, targetReplicas });
+    return res.data;
+  },
+  getPolicies: async (): Promise<ScalingPolicy[]> => {
+    const res = await api.get<ScalingPolicy[]>('/scaling/policies');
+    return res.data;
+  },
+  getPolicyForTarget: async (targetId: string): Promise<ScalingPolicy | null> => {
+    const res = await api.get<ScalingPolicy | null>(`/scaling/policies/target/${encodeURIComponent(targetId)}`);
+    return res.data;
+  },
+  createPolicy: async (data: CreateScalingPolicyInput): Promise<ScalingPolicy> => {
+    const res = await api.post<ScalingPolicy>('/scaling/policies', data);
+    return res.data;
+  },
+  updatePolicy: async (id: string, data: Partial<CreateScalingPolicyInput>): Promise<ScalingPolicy> => {
+    const res = await api.put<ScalingPolicy>(`/scaling/policies/${id}`, data);
+    return res.data;
+  },
+  togglePolicy: async (id: string): Promise<ScalingPolicy> => {
+    const res = await api.patch<ScalingPolicy>(`/scaling/policies/${id}/toggle`);
+    return res.data;
+  },
+  deletePolicy: async (id: string): Promise<any> => {
+    const res = await api.delete(`/scaling/policies/${id}`);
+    return res.data;
+  },
+};
+
 

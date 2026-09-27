@@ -10,7 +10,10 @@ router.use(authenticateToken);
 router.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const volumes = await dockerService.listVolumes();
-    res.json(volumes);
+    const visibleVolumes = req.user?.role === 'admin'
+      ? volumes
+      : volumes.filter((v: any) => !v.isSelf);
+    res.json(visibleVolumes);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to list volumes' });
   }

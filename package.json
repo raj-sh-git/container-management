@@ -1,7 +1,7 @@
 {
-  "name": "docker-container-management-platform",
-  "version": "0.2.0",
-  "description": "Modern Docker Container Management with Web Terminal, Live Logs & Trivy Security Scanning",
+  "name": "container-management-platform",
+  "version": "0.3.0",
+  "description": "Modern Container Management Platform with Web Terminal, Live Logs, Autoscaling & Security Scanning",
   "scripts": {
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",

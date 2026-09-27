@@ -32,7 +32,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
   const [diskUsage, setDiskUsage] = useState<any>(null);
   const [pruneResult, setPruneResult] = useState<any>(null);
   const [pruning, setPruning] = useState<boolean>(false);
-  const [pruneAll, setPruneAll] = useState<boolean>(false);
+  const [pruneAll, setPruneAll] = useState<boolean>(true);
   const [pruneVolumes, setPruneVolumes] = useState<boolean>(false);
 
   // Schedules state
@@ -89,7 +89,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
   };
 
   const handlePrune = async () => {
-    if (!confirm('Run Docker System Prune? This will permanently delete unused Docker resources.')) return;
+    if (!confirm('Run System Prune? This will permanently delete unused container resources.')) return;
     setPruning(true);
     setPruneResult(null);
     try {
@@ -190,7 +190,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
               <Server className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Docker Daemon Specifications</h3>
+              <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Container Engine Specifications</h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Node Architecture & Engine Runtime</p>
             </div>
           </div>
@@ -218,7 +218,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
         </div>
       )}
 
-      {/* Disk Space Breakdown (docker system df) */}
+      {/* Disk Space Breakdown */}
       {diskUsage && (
         <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
           <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
@@ -227,7 +227,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
                 <HardDrive className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Docker Disk Usage (docker system df)</h3>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Engine Disk Usage (System Storage Reclaim)</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">Total space consumed by images, containers, and volumes</p>
               </div>
             </div>
@@ -296,7 +296,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">Automated Clean-Up Scheduler</h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Configure recurring or one-time automated garbage collection tasks for Docker resources
+                  Configure recurring or one-time automated garbage collection tasks for container resources
                 </p>
               </div>
             </div>
@@ -318,7 +318,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
               <Calendar className="w-8 h-8 text-zinc-400 mx-auto" />
               <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">No automated clean-up schedules configured</p>
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                Create a recurring or one-time schedule to automatically reclaim disk space from unused Docker resources.
+                Create a recurring or one-time schedule to automatically reclaim disk space from unused container resources.
               </p>
             </div>
           ) : (
@@ -530,12 +530,35 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh }) => 
           </div>
 
           {pruneResult && (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-600 dark:text-emerald-300 font-mono space-y-1">
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-600 dark:text-emerald-300 font-mono space-y-1.5">
               <div className="font-bold flex items-center space-x-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 <span>Prune complete! Reclaimed disk space.</span>
               </div>
-              <div>Space Reclaimed: {formatBytes(pruneResult.containers?.SpaceReclaimed || 0)}</div>
+              {(() => {
+                const total =
+                  pruneResult.totalSpaceReclaimed !== undefined
+                    ? pruneResult.totalSpaceReclaimed
+                    : (pruneResult.containers?.SpaceReclaimed || 0) +
+                      (pruneResult.images?.SpaceReclaimed || 0) +
+                      (pruneResult.volumes?.SpaceReclaimed || 0);
+                const imagesCount = pruneResult.images?.ImagesDeleted?.length || 0;
+                const containersCount = pruneResult.containers?.ContainersDeleted?.length || 0;
+                const volumesCount = pruneResult.volumes?.VolumesDeleted?.length || 0;
+                return (
+                  <div className="space-y-0.5 text-[11px] text-zinc-700 dark:text-zinc-300">
+                    <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                      Total Space Reclaimed: {formatBytes(total)}
+                    </div>
+                    {imagesCount > 0 && <div>• Images Deleted: {imagesCount}</div>}
+                    {containersCount > 0 && <div>• Stopped Containers Deleted: {containersCount}</div>}
+                    {volumesCount > 0 && <div>• Volumes Deleted: {volumesCount}</div>}
+                    {imagesCount === 0 && containersCount === 0 && volumesCount === 0 && total === 0 && (
+                      <div className="text-zinc-500">No unreferenced resources found to reclaim.</div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

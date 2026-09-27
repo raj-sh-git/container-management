@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const navContent = (
-    <div className="flex flex-col justify-between h-full">
+    <div className="flex flex-col justify-between min-h-full">
       <div className="space-y-6">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-3 mb-2">
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <div className="space-y-2 mt-6">
+      <div className="space-y-2 mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 shrink-0">
         {/* Version & Changelog Trigger Card */}
         <button
           onClick={() => {
@@ -129,14 +129,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="flex items-center space-x-2">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Manager v0.2.0</span>
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Manager v0.3.0</span>
           </div>
           <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Changelog</span>
         </button>
 
         <div className="p-3 bg-zinc-100 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800/80">
           <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Socket Connection</div>
-          <div className="text-[11px] text-zinc-600 dark:text-zinc-500 font-mono mt-0.5 truncate" title="Active Docker socket">
+          <div className="text-[11px] text-zinc-600 dark:text-zinc-500 font-mono mt-0.5 truncate" title="Active engine socket">
             /var/run/docker.sock
           </div>
         </div>
@@ -146,8 +146,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
-      <aside className="hidden md:flex w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0e] flex-col justify-between p-4 shrink-0 min-h-[calc(100vh-4rem)] transition-colors">
+      {/* Desktop Persistent Sidebar with Independent Scroll */}
+      <aside className="hidden md:flex w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0e] flex-col p-4 shrink-0 h-full overflow-y-auto transition-colors">
         {navContent}
       </aside>
 
@@ -172,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Server className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-bold text-sm text-zinc-900 dark:text-white">Docker Control</span>
+              <span className="font-bold text-sm text-zinc-900 dark:text-white">Container Manager</span>
               <p className="text-[10px] text-zinc-500">Mobile Navigation</p>
             </div>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { containersApi } from '../../services/api';
 import { DockerImage, DockerNetwork } from '../../types';
-import { Box, X, Plus, Trash2, Play, Loader2 } from 'lucide-react';
+import { Box, X, Plus, Trash2, Play, Loader2, Minus, Maximize2, Minimize2 } from 'lucide-react';
 
 interface CreateContainerModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
   networks,
   onCreated,
 }) => {
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
   const [image, setImage] = useState<string>('');
   const [command, setCommand] = useState<string>('');
@@ -116,9 +119,48 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-colors">
+  if (isMinimized) {
+    return createPortal(
+      <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+        <div className="flex items-center space-x-2">
+          <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+            <Box className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900 dark:text-white">Create Container</p>
+            <p className="text-[10px] text-zinc-400">{image || 'Configuring...'}</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Restore window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              setIsMinimized(false);
+              setIsMaximized(false);
+              onClose();
+            }}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden ${
+        isMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -130,9 +172,33 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
               <p className="text-xs text-zinc-500 dark:text-zinc-400">Configure parameters, ports, volumes and resources</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title={isMaximized ? "Restore size" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => {
+                setIsMinimized(false);
+                setIsMaximized(false);
+                onClose();
+              }}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Form Body */}
@@ -500,6 +566,7 @@ export const CreateContainerModal: React.FC<CreateContainerModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

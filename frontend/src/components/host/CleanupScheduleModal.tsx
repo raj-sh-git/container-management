@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Layers, HardDrive, Network, Box, RefreshCw, Sparkles, AlertCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Calendar, Clock, Layers, HardDrive, Network, Box, RefreshCw, Sparkles, AlertCircle, Minus, Maximize2, Minimize2 } from 'lucide-react';
 import { CleanupSchedule, CreateCleanupScheduleInput } from '../../types';
 
 interface CleanupScheduleModalProps {
@@ -15,6 +16,8 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
   onSave,
   editingSchedule,
 }) => {
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const [name, setName] = useState('');
   const [cleanImages, setCleanImages] = useState(true);
   const [cleanImagesMode, setCleanImagesMode] = useState<'all' | 'dangling'>('all');
@@ -174,9 +177,48 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+  if (isMinimized) {
+    return createPortal(
+      <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+        <div className="flex items-center space-x-2">
+          <div className="p-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg border border-indigo-500/20">
+            <Calendar className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-bold text-zinc-900 dark:text-white">Clean-Up Schedule</p>
+            <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">{name || 'Configuring...'}</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Restore window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              setIsMinimized(false);
+              setIsMaximized(false);
+              onClose();
+            }}
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Close"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col shadow-2xl overflow-hidden transition-all ${
+        isMaximized ? 'w-full h-full inset-0 rounded-none max-w-none' : 'rounded-3xl max-w-xl w-full max-h-[92vh] sm:max-h-[90vh]'
+      }`}>
         {/* Header */}
         <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -188,16 +230,37 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
                 {editingSchedule ? 'Edit Clean-Up Schedule' : 'Schedule Auto Clean-Up'}
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Automate Docker garbage collection with recurring or one-time schedules
+                Automate container garbage collection with recurring or one-time schedules
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title={isMaximized ? "Restore size" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => {
+                setIsMinimized(false);
+                setIsMaximized(false);
+                onClose();
+              }}
+              className="p-1.5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -337,7 +400,7 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
                   />
                   <span className="flex items-center space-x-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                    <span>Docker Build Cache</span>
+                    <span>Build Cache</span>
                   </span>
                 </label>
               </div>
@@ -495,6 +558,7 @@ export const CleanupScheduleModal: React.FC<CleanupScheduleModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

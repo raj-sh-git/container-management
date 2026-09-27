@@ -190,7 +190,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Docker Image Registry</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Container Images & Registry</h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Manage local images, pull from public / private registries, tag & inspect layers
           </p>
@@ -440,7 +440,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
             <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div className="flex items-center space-x-2">
                 <DownloadCloud className="w-5 h-5 text-blue-500" />
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Pull Docker Image</h3>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Pull Container Image</h3>
               </div>
               <button
                 onClick={() => setIsPullModalOpen(false)}

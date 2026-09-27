@@ -9,16 +9,32 @@ interface ChangelogModalProps {
 
 const CHANGELOG_DATA: ChangelogItem[] = [
   {
+    version: '0.3.0',
+    date: '2026-09-27',
+    title: 'Container Autoscaling, RBAC Protection & User Management',
+    changes: [
+      'Horizontal Container Scaling & Autoscaling: Manual replica scaling (1-20 replicas) and metrics-driven autoscaler policies based on CPU and memory thresholds with cooldown protection',
+      'Internal DNS Load Balancing: Scaled replicas automatically receive network aliases enabling native round-robin load distribution across internal networks',
+      'Container Protection & Hiding: Role-based safeguards allowing administrators to hide containers or protect them against termination from operators and viewers',
+      'Platform Self-Protection: Default automatic shielding of Container Manager, its network, and storage volumes from non-admin roles',
+      'User Management Bulk Import: CSV and spreadsheet user onboarding with downloadable template and validation preview',
+      'User Disaster Recovery Backup: Administrator export and backup utility for user accounts and permission structures',
+      'UI Layout & Navigation: Persistent page state on refresh and independent sidebar scrolling',
+      'Modal Window Controls: Minimize dock and maximize fullscreen modes on dialogs and detail drawers',
+      'Audit Maintenance: Administrative audit log purge functionality',
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-09-12',
     title: 'Automated Cleanup Scheduler & UI Enhancements',
     changes: [
       'Automated Clean-Up Scheduler: Schedule one-time or recurring pruning for unused/dangling images, volumes, networks, stopped containers, and build cache',
-      'Unused Images Identification: Visual badge tagging unused Docker images across the Images catalog',
+      'Unused Images Identification: Visual badge tagging unused container images across the catalog',
       'Login Page Theme Switcher: Dark and Light mode toggle accessible directly on the sign-in screen',
       'Credential Security: Removed default credentials prefill on the login screen',
       'Storage Reclaim Analytics: Real-time calculation and audit logging of reclaimed disk space',
-      'Multi-Arch Support: Production Docker builds supporting both linux/amd64 and linux/arm64 architectures',
+      'Multi-Arch Support: Production container builds supporting both linux/amd64 and linux/arm64 architectures',
     ],
   },
   {
@@ -31,7 +47,7 @@ const CHANGELOG_DATA: ChangelogItem[] = [
       'RBAC Safeguards: Sole admin protection and prevention of self-role-demotion or self-deletion',
       'Trivy Security Scanning: Container & image vulnerability analysis with severity breakdown and exportable reports',
       'Interactive Terminal & Real-Time Logs: Web-based container console and live log streaming',
-      'Compose Stacks & Engine Overview: Full lifecycle management for Docker Compose stacks, volumes, and networks',
+      'Compose Stacks & Engine Overview: Full lifecycle management for Compose stacks, volumes, and networks',
     ],
   },
 ];

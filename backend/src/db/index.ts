@@ -87,6 +87,35 @@ export async function initDatabase() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS scaling_policies (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      target_type TEXT NOT NULL DEFAULT 'container',
+      target_id TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      min_replicas INTEGER NOT NULL DEFAULT 1,
+      max_replicas INTEGER NOT NULL DEFAULT 3,
+      current_replicas INTEGER NOT NULL DEFAULT 1,
+      cpu_threshold INTEGER NOT NULL DEFAULT 80,
+      memory_threshold INTEGER NOT NULL DEFAULT 85,
+      cooldown_seconds INTEGER NOT NULL DEFAULT 60,
+      last_scale_at TEXT,
+      last_scale_action TEXT,
+      last_scale_reason TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS container_flags (
+      container_id TEXT PRIMARY KEY,
+      container_name TEXT,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      is_protected INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      updated_by TEXT
+    );
   `);
 
   // Ensure must_change_password column exists if DB was already created
