@@ -44,7 +44,8 @@ router.get('/version', async (req: AuthenticatedRequest, res: Response) => {
 // Disk usage
 router.get('/df', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const df = await dockerService.getDiskUsage();
+    const force = req.query.fresh === 'true';
+    const df = await dockerService.getDiskUsage(force);
     res.json(df);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to get disk usage' });

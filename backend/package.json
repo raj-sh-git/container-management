@@ -1,6 +1,6 @@
 {
   "name": "container-management-backend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Backend for Container Management Platform with Socket, WebSockets & Security Scanner",
   "main": "dist/index.js",
   "scripts": {
@@ -9,18 +9,21 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
     "dockerode": "^4.0.4",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.3",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "ssh2": "^1.17.0",
     "ws": "^8.18.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.12",
     "@types/cors": "^2.8.17",
@@ -28,6 +31,7 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^22.13.4",
+    "@types/ssh2": "^1.15.6",
     "@types/ws": "^8.5.14",
     "drizzle-kit": "^0.30.4",
     "ts-node-dev": "^2.0.0",
@@ -35,6 +39,11 @@
   },
   "overrides": {
     "qs": "^6.16.0",
-    "cross-spawn": "^7.0.6"
+    "cross-spawn": "^7.0.6",
+    "proxy-addr": "^2.0.8",
+    "@grpc/grpc-js": "^1.14.5",
+    "uuid": "^11.1.1",
+    "shell-quote": "^1.11.0"
   }
 }
+

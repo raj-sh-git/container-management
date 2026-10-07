@@ -9,6 +9,22 @@ interface ChangelogModalProps {
 
 const CHANGELOG_DATA: ChangelogItem[] = [
   {
+    version: '0.4.0',
+    date: '2026-10-08',
+    title: 'SSH Terminal, Concurrent Trivy Scans & Performance Optimization',
+    changes: [
+      'SSH Terminal: Full interactive web-based SSH terminal supporting multiple simultaneous remote host connections with tabbed navigation, PTY resizing, and bulk session disconnect',
+      'SSH Quick Connect & Profiles: Save remote host configurations locally with quick autofill, instant connection switching, and bulk clear profile action',
+      'Trivy Concurrent Scanning: High-concurrency vulnerability scanning across multiple images without UI table flicker',
+      'Trivy Batch Reports Management: Multi-select checkbox support for security reports, allowing batch deletion and single-click consolidated ZIP archive export',
+      'Security Hardening & CVE Remediations: Resolved critical and high-severity dependencies (proxy-addr, shell-quote, @grpc/grpc-js, drizzle-orm, uuid) and upgraded Trivy engine to v0.75.0',
+      'Host Info Performance & Caching: Added backend disk usage caching (30s TTL) with manual force-refresh and preserved frontend state to eliminate page-change lag',
+      'Unified Animated Refresh Controls: Standardized interactive spinning refresh action across all platform views (Containers, Images, Networks, Stacks, Volumes, Host Info)',
+      'Catalog Alignment & Stable Sorting: Aligned Images catalog column headers and stabilized deterministic sorting across all entity lists upon refresh',
+      'Network Tab Typography: Standardized font sizing across Networks management tab for visual consistency',
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-09-27',
     title: 'Container Autoscaling, RBAC Protection & User Management',
@@ -122,7 +138,7 @@ export const ChangelogModal: React.FC<ChangelogModalProps> = ({ isOpen, onClose 
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-          <span>Container Manager v0.2.0</span>
+          <span>Container Manager v0.4.0</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold rounded-xl transition-colors"

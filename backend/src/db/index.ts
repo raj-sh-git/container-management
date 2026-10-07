@@ -24,6 +24,8 @@ export async function initDatabase() {
       role TEXT NOT NULL DEFAULT 'operator',
       is_active INTEGER NOT NULL DEFAULT 1,
       must_change_password INTEGER NOT NULL DEFAULT 1,
+      can_access_ssh INTEGER NOT NULL DEFAULT 0,
+      can_access_exec INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -118,9 +120,15 @@ export async function initDatabase() {
     );
   `);
 
-  // Ensure must_change_password column exists if DB was already created
+  // Ensure column additions exist if DB was already created
   try {
     sqlite.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN can_access_ssh INTEGER NOT NULL DEFAULT 0;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN can_access_exec INTEGER NOT NULL DEFAULT 1;');
   } catch {}
 
   // Check if default admin exists; if not, seed admin
@@ -137,6 +145,8 @@ export async function initDatabase() {
       role: 'admin',
       isActive: true,
       mustChangePassword: true,
+      canAccessSsh: true,
+      canAccessExec: true,
       createdAt: now,
       updatedAt: now,
     }).run();

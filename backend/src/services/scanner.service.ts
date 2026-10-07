@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { promisify } from 'util';
+import AdmZip from 'adm-zip';
 import { config } from '../config';
 import { db } from '../db';
 import * as schema from '../db/schema';
@@ -115,6 +116,38 @@ export class ScannerService {
 
     db.delete(schema.scanReports).where(eq(schema.scanReports.id, id)).run();
     return true;
+  }
+
+  async createReportsZip(reportIds: string[]): Promise<Buffer> {
+    const zip = new AdmZip();
+    for (const id of reportIds) {
+      const report = await this.getReport(id);
+      if (!report) continue;
+
+      const safeTargetName = report.targetName.replace(/[/\\?%*:|"<>]/g, '_');
+      const filenamePrefix = `${safeTargetName}-${report.id.slice(0, 8)}`;
+
+      // Try generating / fetching HTML report
+      try {
+        const html = await this.getReportHtml(id);
+        if (html) {
+          zip.addFile(`${filenamePrefix}.html`, Buffer.from(html, 'utf-8'));
+        }
+      } catch (err) {
+        console.warn(`[Scanner] Could not add HTML report for ${id} to zip:`, err);
+      }
+
+      // Also include raw JSON report if available
+      if (report.jsonReportPath && fs.existsSync(report.jsonReportPath)) {
+        try {
+          const jsonContent = fs.readFileSync(report.jsonReportPath);
+          zip.addFile(`${filenamePrefix}.json`, jsonContent);
+        } catch (err) {
+          console.warn(`[Scanner] Could not add JSON report for ${id} to zip:`, err);
+        }
+      }
+    }
+    return zip.toBuffer();
   }
 
   async startScan(

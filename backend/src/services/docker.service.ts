@@ -87,53 +87,127 @@ export class DockerService {
     return await this.docker.info();
   }
 
-  async getHostMetrics(): Promise<HostMetrics> {
-    const cpusStart = os.cpus();
-    const startTimes = cpusStart.map((c) => {
+  private lastCpuTimes: Array<{ idle: number; total: number }> = [];
+  private cachedMetrics: HostMetrics | null = null;
+  private cpuMonitorTimer?: NodeJS.Timeout;
+  private cachedDf: any = null;
+  private lastDfTime: number = 0;
+  private isDfUpdating: boolean = false;
+
+  constructor() {
+    this.initMetricsSampler();
+    // Warm up disk usage cache in background
+    setTimeout(() => {
+      this.getDiskUsage().catch(() => {});
+    }, 1000);
+  }
+
+  private initMetricsSampler() {
+    this.lastCpuTimes = this.sampleCpuSnapshot();
+    // Quick initial sample after 500ms so metrics are ready immediately
+    setTimeout(() => {
+      this.updateHostMetrics();
+    }, 500).unref();
+
+    // Continuous background CPU sampling every 2 seconds
+    this.cpuMonitorTimer = setInterval(() => {
+      this.updateHostMetrics();
+    }, 2000);
+    this.cpuMonitorTimer.unref();
+  }
+
+  private sampleCpuSnapshot(): Array<{ idle: number; total: number }> {
+    const cpus = os.cpus();
+    return cpus.map((c) => {
       let total = 0;
-      for (const t in c.times) {
-        total += (c.times as any)[t];
-      }
+      for (const t in c.times) total += (c.times as any)[t];
       return { idle: c.times.idle, total };
     });
+  }
 
-    // Sample CPU for 100ms
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  private updateHostMetrics() {
+    const cpus = os.cpus();
+    const currentSnap = this.sampleCpuSnapshot();
 
-    const cpusEnd = os.cpus();
-    const perCoreUsage: number[] = cpusEnd.map((c, idx) => {
-      const start = startTimes[idx];
-      let endTotal = 0;
-      for (const t in c.times) {
-        endTotal += (c.times as any)[t];
-      }
-      const idleDiff = c.times.idle - (start?.idle ?? 0);
-      const totalDiff = endTotal - (start?.total ?? 0);
-      const pct = totalDiff > 0 ? (1 - idleDiff / totalDiff) * 100 : 0;
-      return Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
-    });
+    let perCoreUsage: number[] = [];
+    let avgCpu = 0;
 
-    const avgCpu =
-      perCoreUsage.length > 0
-        ? Math.round((perCoreUsage.reduce((a, b) => a + b, 0) / perCoreUsage.length) * 10) / 10
-        : 0;
+    if (this.lastCpuTimes.length === currentSnap.length && this.lastCpuTimes.length > 0) {
+      perCoreUsage = currentSnap.map((curr, idx) => {
+        const prev = this.lastCpuTimes[idx];
+        const idleDiff = curr.idle - (prev?.idle ?? 0);
+        const totalDiff = curr.total - (prev?.total ?? 0);
+        const rawPct = totalDiff > 0 ? (1 - idleDiff / totalDiff) * 100 : (this.cachedMetrics?.cpu.perCoreUsage[idx] ?? 0);
+        return Math.min(100, Math.max(0, Math.round(rawPct * 10) / 10));
+      });
 
-    // Memory Calculation
-    const totalMem = os.totalmem();
+      const rawAvg =
+        perCoreUsage.length > 0
+          ? Math.round((perCoreUsage.reduce((a, b) => a + b, 0) / perCoreUsage.length) * 10) / 10
+          : 0;
+
+      // Apply EMA smoothing (80% current interval + 20% previous interval)
+      const prevAvg = this.cachedMetrics?.cpu.usagePercent ?? rawAvg;
+      avgCpu = Math.round((0.8 * rawAvg + 0.2 * prevAvg) * 10) / 10;
+    } else {
+      perCoreUsage = currentSnap.map(() => 0);
+    }
+
+    this.lastCpuTimes = currentSnap;
+
+    const memory = this.getSystemMemory();
+
+    this.cachedMetrics = {
+      cpu: {
+        usagePercent: avgCpu,
+        cores: cpus.length,
+        model: cpus[0]?.model || os.arch(),
+        speedMHz: cpus[0]?.speed || 0,
+        loadAvg: [
+          Math.round(os.loadavg()[0] * 100) / 100,
+          Math.round(os.loadavg()[1] * 100) / 100,
+          Math.round(os.loadavg()[2] * 100) / 100,
+        ],
+        perCoreUsage,
+      },
+      memory,
+      uptimeSeconds: Math.floor(os.uptime()),
+      platform: os.platform(),
+      arch: os.arch(),
+      hostname: os.hostname(),
+    };
+  }
+
+  private getSystemMemory() {
+    let totalMem = os.totalmem();
     let freeMem = os.freemem();
 
-    if (process.platform === 'linux') {
+    if (process.platform === 'linux' && fs.existsSync('/proc/meminfo')) {
       try {
-        if (fs.existsSync('/proc/meminfo')) {
-          const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');
-          const availableMatch = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/);
-          if (availableMatch && availableMatch[1]) {
-            freeMem = parseInt(availableMatch[1], 10) * 1024;
-          }
+        const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');
+        const totalMatch = meminfo.match(/MemTotal:\s+(\d+)\s+kB/);
+        const availableMatch = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/);
+        const freeMatch = meminfo.match(/MemFree:\s+(\d+)\s+kB/);
+        const buffersMatch = meminfo.match(/Buffers:\s+(\d+)\s+kB/);
+        const cachedMatch = meminfo.match(/Cached:\s+(\d+)\s+kB/);
+        const sReclaimMatch = meminfo.match(/SReclaimable:\s+(\d+)\s+kB/);
+        const shmemMatch = meminfo.match(/Shmem:\s+(\d+)\s+kB/);
+
+        if (totalMatch && totalMatch[1]) {
+          totalMem = parseInt(totalMatch[1], 10) * 1024;
         }
-      } catch {
-        // Fallback to os.freemem()
-      }
+
+        if (availableMatch && availableMatch[1]) {
+          freeMem = parseInt(availableMatch[1], 10) * 1024;
+        } else if (freeMatch && freeMatch[1]) {
+          const rawFree = parseInt(freeMatch[1], 10) * 1024;
+          const buffers = buffersMatch ? parseInt(buffersMatch[1], 10) * 1024 : 0;
+          const cached = cachedMatch ? parseInt(cachedMatch[1], 10) * 1024 : 0;
+          const sReclaim = sReclaimMatch ? parseInt(sReclaimMatch[1], 10) * 1024 : 0;
+          const shmem = shmemMatch ? parseInt(shmemMatch[1], 10) * 1024 : 0;
+          freeMem = Math.min(totalMem, Math.max(rawFree, rawFree + buffers + cached + sReclaim - shmem));
+        }
+      } catch {}
     } else if (process.platform === 'darwin') {
       try {
         const out = execSync('vm_stat', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 });
@@ -142,53 +216,82 @@ export class DockerService {
         const free = parseInt((out.match(/Pages free:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
         const inactive = parseInt((out.match(/Pages inactive:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
         const speculative = parseInt((out.match(/Pages speculative:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
-        const available = free + inactive + speculative;
+        const purgeable = parseInt((out.match(/Pages purgeable:\s+(\d+)/) || [])[1] || '0', 10) * pageSize;
+        const available = free + inactive + speculative + purgeable;
         if (available > 0 && available < totalMem) {
           freeMem = available;
         }
-      } catch {
-        // Fallback to os.freemem()
-      }
+      } catch {}
     }
 
+    if (freeMem > totalMem) freeMem = totalMem;
     const usedMem = Math.max(0, totalMem - freeMem);
-    const memPercent = totalMem > 0 ? Math.round((usedMem / totalMem) * 1000) / 10 : 0;
+    const usagePercent = totalMem > 0 ? Math.round((usedMem / totalMem) * 1000) / 10 : 0;
 
     return {
-      cpu: {
-        usagePercent: avgCpu,
-        cores: cpusEnd.length,
-        model: cpusEnd[0]?.model || os.arch(),
-        speedMHz: cpusEnd[0]?.speed || 0,
-        loadAvg: [
-          Math.round(os.loadavg()[0] * 100) / 100,
-          Math.round(os.loadavg()[1] * 100) / 100,
-          Math.round(os.loadavg()[2] * 100) / 100,
-        ],
-        perCoreUsage,
-      },
-      memory: {
-        totalBytes: totalMem,
-        usedBytes: usedMem,
-        freeBytes: freeMem,
-        usagePercent: memPercent,
-      },
-      uptimeSeconds: Math.floor(os.uptime()),
-      platform: os.platform(),
-      arch: os.arch(),
-      hostname: os.hostname(),
+      totalBytes: totalMem,
+      usedBytes: usedMem,
+      freeBytes: freeMem,
+      usagePercent,
     };
+  }
+
+  async getHostMetrics(): Promise<HostMetrics> {
+    if (!this.cachedMetrics) {
+      this.updateHostMetrics();
+    }
+    return (
+      this.cachedMetrics || {
+        cpu: {
+          usagePercent: 0,
+          cores: os.cpus().length,
+          model: os.cpus()[0]?.model || os.arch(),
+          speedMHz: os.cpus()[0]?.speed || 0,
+          loadAvg: [0, 0, 0],
+          perCoreUsage: os.cpus().map(() => 0),
+        },
+        memory: this.getSystemMemory(),
+        uptimeSeconds: Math.floor(os.uptime()),
+        platform: os.platform(),
+        arch: os.arch(),
+        hostname: os.hostname(),
+      }
+    );
   }
 
   async getVersion() {
     return await this.docker.version();
   }
 
-  async getDiskUsage() {
-    return await this.docker.df();
+  async getDiskUsage(force: boolean = false) {
+    const now = Date.now();
+    // Return cache if fresher than 30s and not forced
+    if (!force && this.cachedDf && now - this.lastDfTime < 30000) {
+      return this.cachedDf;
+    }
+
+    // Return stale cache immediately if background fetch is already in-flight
+    if (this.cachedDf && this.isDfUpdating && !force) {
+      return this.cachedDf;
+    }
+
+    try {
+      this.isDfUpdating = true;
+      const df = await this.docker.df();
+      this.cachedDf = df;
+      this.lastDfTime = Date.now();
+      return df;
+    } catch (err) {
+      if (this.cachedDf) return this.cachedDf;
+      throw err;
+    } finally {
+      this.isDfUpdating = false;
+    }
   }
 
   async systemPrune(options: { all?: boolean; volumes?: boolean } = {}) {
+    this.cachedDf = null;
+    this.lastDfTime = 0;
     const results: any = {};
     results.containers = await this.docker.pruneContainers();
     // In Docker API: dangling: false prunes ALL unused images (not just dangling ones)
@@ -324,7 +427,7 @@ export class DockerService {
   // ==================== CONTAINERS ====================
   async listContainers(all: boolean = true) {
     const containers = await this.docker.listContainers({ all });
-    return containers.map((c) => {
+    const mapped = containers.map((c) => {
       const isSelf = this.isSelfContainer({ Id: c.Id, Names: c.Names });
       return {
         id: c.Id,
@@ -346,6 +449,8 @@ export class DockerService {
         composeService: c.Labels?.['com.docker.compose.service'],
       };
     });
+    mapped.sort((a, b) => a.name.localeCompare(b.name));
+    return mapped;
   }
 
   async getContainer(id: string) {
@@ -544,7 +649,9 @@ export class DockerService {
       }
     }
 
-    return Array.from(stacksMap.values());
+    const result = Array.from(stacksMap.values());
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    return result;
   }
 
   async startStack(stackName: string) {
@@ -897,7 +1004,7 @@ export class DockerService {
       }
     }
 
-    return images.map((img) => {
+    const mapped = images.map((img) => {
       const cleanId = img.Id.replace(/^sha256:/, '');
       const isInUseById = usedImageIds.has(img.Id) || usedImageIds.has(cleanId);
       const isInUseByName = (img.RepoTags || []).some((tag) => usedImageNames.has(tag));
@@ -916,6 +1023,15 @@ export class DockerService {
         inUse,
       };
     });
+
+    mapped.sort((a, b) => {
+      if (b.created !== a.created) return b.created - a.created;
+      const tagA = a.repoTags[0] || '';
+      const tagB = b.repoTags[0] || '';
+      return tagA.localeCompare(tagB);
+    });
+
+    return mapped;
   }
 
 
@@ -1021,7 +1137,7 @@ export class DockerService {
       })),
     ]);
     const volumes = res.Volumes || [];
-    return volumes.map((v) => {
+    const mapped = volumes.map((v) => {
       const isSelf =
         selfInfo.volumes.has(v.Name) ||
         v.Name.toLowerCase().includes('container-management') ||
@@ -1031,6 +1147,8 @@ export class DockerService {
         isSelf,
       };
     });
+    mapped.sort((a, b) => a.Name.localeCompare(b.Name));
+    return mapped;
   }
 
   async inspectVolume(name: string) {
@@ -1061,7 +1179,7 @@ export class DockerService {
         containerIds: new Set<string>(),
       })),
     ]);
-    return nets.map((n) => {
+    const mapped = nets.map((n) => {
       const isSelf =
         selfInfo.networks.has(n.Name) ||
         n.Name.toLowerCase().includes('container-management') ||
@@ -1071,6 +1189,8 @@ export class DockerService {
         isSelf,
       };
     });
+    mapped.sort((a, b) => a.Name.localeCompare(b.Name));
+    return mapped;
   }
 
   async inspectNetwork(id: string) {

@@ -3,6 +3,7 @@ import { ComposeStack, Container } from '../types';
 import { containersApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ScaleModal } from '../components/containers/ScaleModal';
+import { RefreshButton } from '../components/common/RefreshButton';
 import {
   Boxes,
   Play,
@@ -31,8 +32,44 @@ export const StacksPage: React.FC<StacksPageProps> = ({
 }) => {
   const { isOperator } = useAuth();
   const [expandedStacks, setExpandedStacks] = useState<Record<string, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [scaleTarget, setScaleTarget] = useState<Container | null>(null);
+
+  const sortedStacks = [...stacks].sort((a: any, b: any) => {
+    const valA = String(a[sortConfig.key] || '');
+    const valB = String(b[sortConfig.key] || '');
+    const cmp = valA.localeCompare(valB);
+    if (cmp !== 0) return sortConfig.direction === 'asc' ? cmp : -cmp;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const toggleSelect = (name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) => (prev.includes(name) ? prev.filter((i) => i !== name) : [...prev, name]));
+  };
+
+  const deletableStacks = sortedStacks.filter((s) => !s.isSelf && !s.containers.some((c) => c.isSelf));
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === deletableStacks.length && deletableStacks.length > 0) setSelectedIds([]);
+    else setSelectedIds(deletableStacks.map((s) => s.name));
+  };
+
+  const handleBatchDown = async () => {
+    if (!confirm(`Stop and remove ${selectedIds.length} compose stacks?`)) return;
+    for (const name of selectedIds) {
+      const stack = stacks.find((s) => s.name === name);
+      if (stack && stack.containers.length > 0) {
+        try {
+          await Promise.all(stack.containers.map((c) => containersApi.remove(c.id, true)));
+        } catch (e) {}
+      }
+    }
+    setSelectedIds([]);
+    onRefresh();
+  };
 
   const toggleStack = (name: string) => {
     setExpandedStacks((prev) => ({
@@ -88,17 +125,34 @@ export const StacksPage: React.FC<StacksPageProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onRefresh}
-          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
-          title="Refresh stacks"
-        >
-          <RefreshCw className="w-4 h-4" />
+        <div className="flex items-center space-x-2">
+          <RefreshButton onRefresh={onRefresh} title="Refresh stacks" />
+        </div>
+      </div>
+
+      {selectedIds.length > 0 && isOperator && (
+        <div className="p-3 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between transition-colors shadow-sm mb-4">
+          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {selectedIds.length} Selected
+          </span>
+          <button onClick={handleBatchDown} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-xs font-semibold transition-colors">
+            Down Selected Stacks
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center space-x-4 px-1">
+        <label className="flex items-center space-x-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 cursor-pointer">
+          <input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === deletableStacks.length} onChange={handleSelectAll} className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0" />
+          <span>Select All</span>
+        </label>
+        <button onClick={() => setSortConfig(prev => ({ key: 'name', direction: prev.direction === 'asc' ? 'desc' : 'asc' }))} className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200">
+          Sort by Name {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
         </button>
       </div>
 
       {/* Stacks List */}
-      {stacks.length === 0 ? (
+      {sortedStacks.length === 0 ? (
         <div className="p-16 bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-center space-y-3">
           <FolderGit2 className="w-12 h-12 text-zinc-400 dark:text-zinc-600 mx-auto" />
           <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-200">No Compose Stacks Found</h3>
@@ -108,7 +162,7 @@ export const StacksPage: React.FC<StacksPageProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {stacks.map((stack) => {
+          {sortedStacks.map((stack) => {
             const open = isExpanded(stack.name);
             const isAllRunning = stack.runningCount === stack.totalCount && stack.totalCount > 0;
             const isSelfStack = stack.isSelf || stack.containers.some((c) => c.isSelf);
@@ -124,6 +178,13 @@ export const StacksPage: React.FC<StacksPageProps> = ({
                     onClick={() => toggleStack(stack.name)}
                     className="flex items-center space-x-3 cursor-pointer select-none min-w-0"
                   >
+                    <input
+                      type="checkbox"
+                      disabled={isSelfStack}
+                      checked={selectedIds.includes(stack.name)}
+                      onClick={(e) => toggleSelect(stack.name, e)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    />
                     <button className="p-1 text-zinc-400 hover:text-zinc-200 shrink-0">
                       {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>

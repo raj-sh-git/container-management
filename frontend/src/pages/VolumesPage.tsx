@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { DockerVolume } from '../types';
 import { volumesApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { HardDrive, Plus, Trash2, Search, RefreshCw, X, Eye, ShieldCheck } from 'lucide-react';
+import { HardDrive, Plus, Trash2, Search, X, Eye, ShieldCheck } from 'lucide-react';
+import { RefreshButton } from '../components/common/RefreshButton';
 
 interface VolumesPageProps {
   volumes: DockerVolume[];
@@ -12,6 +13,8 @@ interface VolumesPageProps {
 export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) => {
   const { isOperator } = useAuth();
   const [search, setSearch] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'Name', direction: 'asc' });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [volumeName, setVolumeName] = useState<string>('');
   const [driver, setDriver] = useState<string>('local');
@@ -20,6 +23,44 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
   const filtered = volumes.filter((v) =>
     search ? v.Name.toLowerCase().includes(search.toLowerCase()) : true
   );
+
+  const sorted = [...filtered].sort((a: any, b: any) => {
+    const valA = a[sortConfig.key] || '';
+    const valB = b[sortConfig.key] || '';
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB);
+      if (cmp !== 0) return sortConfig.direction === 'asc' ? cmp : -cmp;
+    } else {
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return a.Name.localeCompare(b.Name);
+  });
+
+  const toggleSelect = (name: string) => {
+    setSelectedIds(prev => prev.includes(name) ? prev.filter(id => id !== name) : [...prev, name]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === sorted.length && sorted.length > 0) setSelectedIds([]);
+    else setSelectedIds(sorted.map(v => v.Name));
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleBatchDelete = async () => {
+    if (!confirm()) return;
+    for (const name of selectedIds) {
+      try { await handleDelete(name); } catch (e) {}
+    }
+    setSelectedIds([]);
+    onRefresh();
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,14 +94,7 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-          <button
-            onClick={onRefresh}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl"
-            title="Refresh volumes"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-
+          <RefreshButton onRefresh={onRefresh} title="Refresh volumes" />
           {isOperator && (
             <button
               onClick={() => setIsCreateOpen(true)}
@@ -90,67 +124,84 @@ export const VolumesPage: React.FC<VolumesPageProps> = ({ volumes, onRefresh }) 
         </div>
       </div>
 
+      {selectedIds.length > 0 && isOperator && (
+        <div className="p-3 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between transition-colors shadow-sm mb-4">
+          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {selectedIds.length} Selected
+          </span>
+          <button onClick={handleBatchDelete} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-xs font-semibold transition-colors">
+            Delete Selected
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-xl transition-colors">
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="py-3 px-4">Volume Name</th>
-                <th className="py-3 px-4">Driver</th>
-                <th className="py-3 px-4">Mountpoint</th>
-                <th className="py-3 px-4">Scope</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-16 text-center text-zinc-500 font-sans">
-                  No volumes found.
-                </td>
+                <th className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
+                  <input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === sorted.length} onChange={handleSelectAll} className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0" />
+                </th>
+                <th className="py-3 px-3 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 select-none" onClick={() => handleSort('Name')}>Volume Name {sortConfig.key === 'Name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                <th className="py-3 px-3 hidden sm:table-cell cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 select-none" onClick={() => handleSort('Driver')}>Driver {sortConfig.key === 'Driver' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                <th className="py-3 px-3 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 select-none" onClick={() => handleSort('Mountpoint')}>Mountpoint {sortConfig.key === 'Mountpoint' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                <th className="py-3 px-3 hidden md:table-cell cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 select-none" onClick={() => handleSort('Scope')}>Scope {sortConfig.key === 'Scope' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                <th className="py-3 px-3 text-right whitespace-nowrap">Actions</th>
               </tr>
-            ) : (
-              filtered.map((v) => (
-                <tr key={v.Name} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">
-                    <div className="flex items-center space-x-2">
-                      <span>{v.Name}</span>
-                      {v.isSelf && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform Storage Volume">
-                          <ShieldCheck className="w-3 h-3" />
-                          <span>Self</span>
-                        </span>
-                      )}
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
+              {sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-zinc-500 font-sans">
+                    No volumes found.
                   </td>
-                  <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">{v.Driver}</td>
-                  <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-sm truncate" title={v.Mountpoint}>
-                    {v.Mountpoint}
-                  </td>
-                  <td className="py-3 px-4 text-zinc-500 uppercase text-[10px]">{v.Scope}</td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button
-                        onClick={async () => {
-                          const data = await volumesApi.inspect(v.Name);
-                          setInspectVolume(data);
-                        }}
-                        title="Inspect"
-                        className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      {isOperator && !v.isSelf && (
+                </tr>
+              ) : (
+                sorted.map((v) => (
+                  <tr key={v.Name} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+                    <td className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
+                      <input type="checkbox" checked={selectedIds.includes(v.Name)} onChange={() => toggleSelect(v.Name)} className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0" />
+                    </td>
+                    <td className="py-3 px-3 font-bold text-zinc-900 dark:text-zinc-200 min-w-0">
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <span className="truncate max-w-[130px] sm:max-w-xs block" title={v.Name}>{v.Name}</span>
+                        {v.isSelf && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1 shrink-0 whitespace-nowrap" title="Platform Storage Volume">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>Self</span>
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-zinc-600 dark:text-zinc-400 hidden sm:table-cell">{v.Driver}</td>
+                    <td className="py-3 px-3 text-zinc-600 dark:text-zinc-400 min-w-0" title={v.Mountpoint}>
+                      <span className="truncate max-w-[130px] sm:max-w-xs md:max-w-sm block">{v.Mountpoint}</span>
+                    </td>
+                    <td className="py-3 px-3 text-zinc-500 uppercase text-[10px] hidden md:table-cell">{v.Scope}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end space-x-2">
                         <button
-                          onClick={() => handleDelete(v.Name)}
-                          title="Delete Volume"
-                          className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20"
+                          onClick={async () => {
+                            const data = await volumesApi.inspect(v.Name);
+                            setInspectVolume(data);
+                          }}
+                          title="Inspect"
+                          className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
-                      )}
-                    </div>
-                  </td>
+                        {isOperator && !v.isSelf && (
+                          <button
+                            onClick={() => handleDelete(v.Name)}
+                            title="Delete Volume"
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                 </tr>
               ))
             )}

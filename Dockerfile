@@ -37,7 +37,7 @@ RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache curl git ca-certificates \
     && mkdir -p /usr/local/bin /root/.trivy \
     && if [ "$TARGETARCH" = "arm64" ] || [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
-    && TRIVY_VERSION="0.74.0" \
+    && TRIVY_VERSION="0.75.0" \
     && curl -fSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" -o trivy.tar.gz \
     && tar -xzf trivy.tar.gz -C /usr/local/bin trivy \
     && chmod +x /usr/local/bin/trivy \

@@ -1,6 +1,6 @@
 {
   "name": "container-management-platform",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Modern Container Management Platform with Web Terminal, Live Logs, Autoscaling & Security Scanning",
   "scripts": {
     "dev:backend": "npm run dev --prefix backend",

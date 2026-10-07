@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DockerImage, Container, ScanReport, RegistryAuth } from '../types';
 import { imagesApi, securityApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -18,12 +18,14 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { RefreshButton } from '../components/common/RefreshButton';
 
 interface ImagesPageProps {
   images: DockerImage[];
   containers?: Container[];
   reports: ScanReport[];
   onRefresh: () => void;
+  onRefreshReports?: () => void;
   onOpenScanModal: (target: { type: 'image'; name: string; id: string }) => void;
 }
 
@@ -32,10 +34,13 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
   containers = [],
   reports,
   onRefresh,
+  onRefreshReports,
   onOpenScanModal,
 }) => {
   const { isOperator } = useAuth();
   const [search, setSearch] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created', direction: 'desc' });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'in-use' | 'unused'>('all');
   const [isPullModalOpen, setIsPullModalOpen] = useState<boolean>(false);
   const [pullImageName, setPullImageName] = useState<string>('');
@@ -89,6 +94,102 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
     );
   });
 
+
+
+  const sorted = [...filteredImages].sort((a: any, b: any) => {
+    let valA = a[sortConfig.key];
+    let valB = b[sortConfig.key];
+    if (sortConfig.key === 'repoTag') {
+      valA = a.repoTags?.[0] || '';
+      valB = b.repoTags?.[0] || '';
+    }
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB);
+      if (cmp !== 0) return sortConfig.direction === 'asc' ? cmp : -cmp;
+    } else if (typeof valA === 'number' && typeof valB === 'number') {
+      if (valA !== valB) return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+    } else {
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return (b.created || 0) - (a.created || 0) || a.id.localeCompare(b.id);
+  });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === sorted.length && sorted.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(sorted.map((img) => img.id));
+    }
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const handleBatchScan = async () => {
+    if (selectedIds.length === 0) return;
+    const selectedImages = sorted.filter((img) => selectedIds.includes(img.id));
+    const newScanning: Record<string, boolean> = {};
+    selectedImages.forEach((img) => {
+      newScanning[img.id] = true;
+    });
+    setScanningMap((prev) => ({ ...prev, ...newScanning }));
+
+    await Promise.allSettled(
+      selectedImages.map(async (img) => {
+        const primaryTag = img.repoTags[0] || img.shortId;
+        try {
+          await securityApi.scan('image', primaryTag, img.id);
+        } catch (err: any) {
+          console.error(`Failed to scan image ${img.id}:`, err);
+          setScanningMap((prev) => {
+            const next = { ...prev };
+            delete next[img.id];
+            return next;
+          });
+        }
+      })
+    );
+
+    if (onRefreshReports) {
+      await onRefreshReports();
+    } else {
+      onRefresh();
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const toDelete = selectedIds.filter((id) => {
+      const img = images.find((i) => i.id === id);
+      return img && !isImageInUse(img);
+    });
+    const inUseCount = selectedIds.length - toDelete.length;
+    if (toDelete.length === 0) {
+      alert('Selected image(s) cannot be deleted because they are currently in use by active containers.');
+      return;
+    }
+    const confirmMsg =
+      inUseCount > 0
+        ? `Delete ${toDelete.length} unused image(s)? (${inUseCount} in-use image(s) will be skipped)`
+        : `Delete ${toDelete.length} image(s)?`;
+    if (!confirm(confirmMsg)) return;
+
+    for (const id of toDelete) {
+      try {
+        await handleDelete(id, '');
+      } catch (e) {}
+    }
+    setSelectedIds([]);
+    onRefresh();
+  };
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -167,21 +268,84 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
   };
 
   const getImageReport = (img: DockerImage) => {
-    return reports.find(
-      (r) => r.targetId === img.id || img.repoTags.some((t) => r.targetName === t)
+    const matching = reports.filter(
+      (r) =>
+        (r.targetId && (r.targetId === img.id || r.targetId === img.shortId)) ||
+        (r.targetName && (img.repoTags.includes(r.targetName) || r.targetName === img.shortId))
     );
+    if (matching.length === 0) return undefined;
+
+    // Prioritize running or pending report
+    const running = matching.find((r) => r.status === 'running' || r.status === 'pending');
+    if (running) return running;
+
+    // Otherwise latest report by createdAt desc
+    const sortedMatching = [...matching].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sortedMatching[0];
   };
+
+  const isImageScanning = (img: DockerImage) => {
+    if (scanningMap[img.id]) return true;
+    const report = getImageReport(img);
+    return Boolean(report && (report.status === 'running' || report.status === 'pending'));
+  };
+
+  // Fast poll reports while scans are executing
+  const isAnyScanRunning =
+    Object.values(scanningMap).some(Boolean) ||
+    reports.some((r) => r.status === 'running' || r.status === 'pending');
+
+  useEffect(() => {
+    if (!isAnyScanRunning) return;
+    const interval = setInterval(() => {
+      if (onRefreshReports) {
+        onRefreshReports();
+      } else {
+        onRefresh();
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isAnyScanRunning, onRefreshReports, onRefresh]);
+
+  // Clean finished scans from scanningMap when reports update
+  useEffect(() => {
+    setScanningMap((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const imgId of Object.keys(next)) {
+        if (!next[imgId]) continue;
+        const img = images.find((i) => i.id === imgId);
+        if (img) {
+          const report = getImageReport(img);
+          if (report && report.status !== 'running' && report.status !== 'pending') {
+            delete next[imgId];
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [reports, images]);
 
   const handleDirectScan = async (img: DockerImage) => {
     const primaryTag = img.repoTags[0] || img.shortId;
     setScanningMap((prev) => ({ ...prev, [img.id]: true }));
     try {
       await securityApi.scan('image', primaryTag, img.id);
-      onRefresh();
+      if (onRefreshReports) {
+        await onRefreshReports();
+      } else {
+        onRefresh();
+      }
     } catch (err: any) {
       alert(err.response?.data?.error || err.message || 'Failed to start image scan');
-    } finally {
-      setScanningMap((prev) => ({ ...prev, [img.id]: false }));
+      setScanningMap((prev) => {
+        const next = { ...prev };
+        delete next[img.id];
+        return next;
+      });
     }
   };
 
@@ -197,13 +361,7 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-          <button
-            onClick={onRefresh}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
-            title="Refresh images"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <RefreshButton onRefresh={onRefresh} title="Refresh images" />
 
           {isOperator && (
             <button
@@ -250,6 +408,33 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           >
             Unused ({unusedCount})
           </button>
+
+          {/* Batch Actions matching ContainersPage style */}
+          {isOperator && selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-3 sm:border-l border-zinc-200 dark:border-zinc-800 mt-2 sm:mt-0">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold mr-1">
+                {selectedIds.length} Selected:
+              </span>
+              <button
+                type="button"
+                onClick={handleBatchScan}
+                className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-lg text-xs font-semibold flex items-center space-x-1"
+                title="Scan all selected images with Trivy concurrently"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>Scan Selected</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleBatchDelete}
+                className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-lg text-xs font-semibold flex items-center space-x-1"
+                title="Delete selected unused images"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="relative w-full md:w-72">
@@ -270,30 +455,47 @@ export const ImagesPage: React.FC<ImagesPageProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-100 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="py-3 px-4">Repository / Tag</th>
+                <th className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length > 0 && selectedIds.length === sorted.length}
+                    onChange={handleSelectAll}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                  />
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('repoTag')}>
+                  Repository / Tag {sortConfig.key === 'repoTag' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th className="py-3 px-4">Image ID</th>
-                <th className="py-3 px-4">Size</th>
-                <th className="py-3 px-4">Created</th>
+                <th className="py-3 px-4 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('size')}>
+                  Size {sortConfig.key === 'size' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('created')}>
+                  Created {sortConfig.key === 'created' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th className="py-3 px-4">Trivy Security</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
-              {filteredImages.length === 0 ? (
+              {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-zinc-500 font-sans">
+                  <td colSpan={7} className="py-16 text-center text-zinc-500 font-sans">
                     No images found matching criteria.
                   </td>
                 </tr>
               ) : (
-                filteredImages.map((img) => {
+                sorted.map((img) => {
                   const report = getImageReport(img);
                   const primaryTag = img.repoTags[0] || '<none>:<none>';
-                  const isScanning = scanningMap[img.id] || (report && report.status === 'running');
+                  const isScanning = isImageScanning(img);
                   const isUnused = !isImageInUse(img);
 
                   return (
-                    <tr key={img.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                    <tr key={img.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+                      <td className="py-3 px-3 w-8 sm:w-10 text-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedIds.includes(img.id)} onChange={() => toggleSelect(img.id)} className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0" />
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-zinc-900 dark:text-zinc-100 font-sans text-sm">{primaryTag}</span>

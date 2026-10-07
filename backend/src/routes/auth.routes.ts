@@ -36,6 +36,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       id: user.id,
       username: user.username,
       role: user.role,
+      canAccessSsh: user.role === 'admin' ? true : Boolean(user.canAccessSsh),
+      canAccessExec: user.role === 'admin' ? true : Boolean(user.canAccessExec),
     },
     config.jwtSecret,
     { expiresIn: '7d' }
@@ -56,6 +58,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       username: user.username,
       email: user.email,
       role: user.role,
+      canAccessSsh: user.role === 'admin' ? true : Boolean(user.canAccessSsh),
+      canAccessExec: user.role === 'admin' ? true : Boolean(user.canAccessExec),
       mustChangePassword: Boolean(user.mustChangePassword),
     },
   });
@@ -73,6 +77,8 @@ router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) 
     username: user.username,
     email: user.email,
     role: user.role,
+    canAccessSsh: user.role === 'admin' ? true : Boolean(user.canAccessSsh),
+    canAccessExec: user.role === 'admin' ? true : Boolean(user.canAccessExec),
     mustChangePassword: Boolean(user.mustChangePassword),
   });
 });

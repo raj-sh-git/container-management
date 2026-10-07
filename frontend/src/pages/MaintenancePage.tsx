@@ -3,6 +3,7 @@ import { CleanupSchedule, CreateCleanupScheduleInput } from '../types';
 import { systemApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { CleanupScheduleModal } from '../components/host/CleanupScheduleModal';
+import { RefreshButton } from '../components/common/RefreshButton';
 import {
   Wrench,
   Trash2,
@@ -157,6 +158,8 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
     );
   }
 
+  const sortedSchedules = [...schedules].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="space-y-6 sm:space-y-8 select-text">
       {/* Header */}
@@ -175,17 +178,15 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            loadSchedules();
-            if (onRefresh) onRefresh();
-          }}
-          disabled={loadingSchedules}
-          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors self-start sm:self-auto disabled:opacity-50"
-          title="Refresh maintenance telemetry"
-        >
-          <RefreshCw className={`w-4 h-4 ${loadingSchedules ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center space-x-2">
+          <RefreshButton
+            onRefresh={async () => {
+              await loadSchedules();
+              if (onRefresh) onRefresh();
+            }}
+            title="Refresh maintenance state"
+          />
+        </div>
       </div>
 
       {/* Automated Clean-Up Scheduler Section */}
@@ -215,7 +216,7 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
         {/* Schedules Table */}
         {loadingSchedules ? (
           <div className="text-center py-8 text-xs text-zinc-500">Loading schedules...</div>
-        ) : schedules.length === 0 ? (
+        ) : sortedSchedules.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl space-y-2">
             <Calendar className="w-8 h-8 text-zinc-400 mx-auto" />
             <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">No automated clean-up schedules configured</p>
@@ -224,21 +225,21 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 uppercase text-[10px] tracking-wider font-semibold">
                   <th className="pb-3 px-3">Schedule Name</th>
-                  <th className="pb-3 px-3">Clean Targets</th>
+                  <th className="pb-3 px-3 hidden sm:table-cell">Clean Targets</th>
                   <th className="pb-3 px-3">Frequency / Type</th>
-                  <th className="pb-3 px-3">Next Run</th>
-                  <th className="pb-3 px-3">Status</th>
-                  <th className="pb-3 px-3">Last Run & Reclaimed</th>
-                  <th className="pb-3 px-3 text-right">Actions</th>
+                  <th className="pb-3 px-3 hidden md:table-cell">Next Run</th>
+                  <th className="pb-3 px-3 text-center whitespace-nowrap">Status</th>
+                  <th className="pb-3 px-3 hidden lg:table-cell whitespace-nowrap">Last Run & Reclaimed</th>
+                  <th className="pb-3 px-3 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-medium">
-                {schedules.map((schedule) => {
+              <tbody className="divide-y border-zinc-200 dark:divide-zinc-800/60 font-medium">
+                {sortedSchedules.map((schedule) => {
                   const isRunning = runningScheduleId === schedule.id;
                   let reclaimed = 0;
                   if (schedule.lastRunSummary) {
@@ -250,12 +251,12 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
 
                   return (
                     <tr key={schedule.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-zinc-900 dark:text-white">{schedule.name}</div>
+                      <td className="py-3 px-3 min-w-0">
+                        <div className="font-bold text-zinc-900 dark:text-white truncate max-w-[130px] sm:max-w-xs" title={schedule.name}>{schedule.name}</div>
                         <div className="text-[10px] text-zinc-400 font-mono">ID: {schedule.id.slice(0, 8)}...</div>
                       </td>
 
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 hidden sm:table-cell">
                         <div className="flex flex-wrap gap-1.5">
                           {schedule.cleanImages && (
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-mono font-semibold">
@@ -293,37 +294,37 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
                       <td className="py-3 px-3">
                         {schedule.scheduleType === 'recurring' ? (
                           <div className="space-y-0.5">
-                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold">
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold whitespace-nowrap">
                               <RefreshCw className="w-3 h-3 text-indigo-500" />
                               <span>Recurring</span>
                             </span>
-                            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                               {schedule.cronExpression}
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-0.5">
-                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold">
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[10px] font-semibold whitespace-nowrap">
                               <Clock className="w-3 h-3 text-amber-500" />
                               <span>Run Once</span>
                             </span>
-                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                               {formatDate(schedule.scheduledAt)}
                             </div>
                           </div>
                         )}
                       </td>
 
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 hidden md:table-cell whitespace-nowrap">
                         <span className="font-mono text-zinc-800 dark:text-zinc-200">
                           {formatDate(schedule.nextRunAt)}
                         </span>
                       </td>
 
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <button
                           onClick={() => handleToggleSchedule(schedule.id)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors whitespace-nowrap ${
                             schedule.enabled
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
                               : 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/20'
@@ -334,7 +335,7 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
                         </button>
                       </td>
 
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3 hidden lg:table-cell whitespace-nowrap">
                         {schedule.lastRunAt ? (
                           <div className="space-y-0.5">
                             <div className="flex items-center space-x-1 text-zinc-700 dark:text-zinc-300">
@@ -352,8 +353,8 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) =
                         )}
                       </td>
 
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end space-x-1.5 shrink-0">
                           <button
                             onClick={() => handleRunScheduleNow(schedule.id, schedule.name)}
                             disabled={isRunning}

@@ -8,6 +8,7 @@ import { LogsViewer } from '../components/logs/LogsViewer';
 import { StatsCards } from '../components/stats/StatsCards';
 import { ReportViewer } from '../components/security/ReportViewer';
 import { ScalePanel } from '../components/containers/ScalePanel';
+import { RefreshButton } from '../components/common/RefreshButton';
 import {
   Box,
   Boxes,
@@ -58,6 +59,7 @@ interface ContainersPageProps {
   onOpenScanModal: (target: { type: 'container'; name: string; id: string }) => void;
   selectedContainerForDetail?: Container | null;
   initialDetailTab?: string;
+  onCloseDetail?: () => void;
 }
 
 export const ContainersPage: React.FC<ContainersPageProps> = ({
@@ -70,8 +72,9 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
   onOpenScanModal,
   selectedContainerForDetail,
   initialDetailTab,
+  onCloseDetail,
 }) => {
-  const { isOperator, isAdmin } = useAuth();
+  const { isOperator, isAdmin, canAccessExec } = useAuth();
   const [filterState, setFilterState] = useState<'all' | 'running' | 'stopped'>('all');
   const [search, setSearch] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -180,6 +183,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
       { container: activeContainer, tab: detailTab },
     ]);
     setActiveContainer(null);
+    if (onCloseDetail) onCloseDetail();
     setIsDetailMaximized(false);
   };
 
@@ -204,6 +208,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
 
   const handleCloseActiveModal = () => {
     setActiveContainer(null);
+    if (onCloseDetail) onCloseDetail();
     setIsDetailMaximized(false);
   };
 
@@ -224,11 +229,32 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
     return matchesState && matchesSearch;
   });
 
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+  const sortedContainers = [...filteredContainers].sort((a: any, b: any) => {
+    const valA = a[sortConfig.key] || '';
+    const valB = b[sortConfig.key] || '';
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB);
+      if (cmp !== 0) return sortConfig.direction === 'asc' ? cmp : -cmp;
+    } else if (typeof valA === 'number' && typeof valB === 'number') {
+      if (valA !== valB) return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+    }
+    return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   const handleSelectAll = () => {
-    if (selectedIds.length === filteredContainers.length) {
+    if (selectedIds.length === sortedContainers.length && sortedContainers.length > 0) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredContainers.map((c) => c.id));
+      setSelectedIds(sortedContainers.map((c) => c.id));
     }
   };
 
@@ -313,12 +339,15 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
     setScanningMap((prev) => ({ ...prev, [c.id]: true }));
     try {
       await securityApi.scan('container', c.name, c.id);
-      onRefresh();
+      await onRefresh();
     } catch (err: any) {
       alert(err.response?.data?.error || err.message || 'Failed to start container scan');
-    } finally {
       setScanningMap((prev) => ({ ...prev, [c.id]: false }));
+      return;
     }
+    setTimeout(() => {
+      setScanningMap((prev) => ({ ...prev, [c.id]: false }));
+    }, 3000);
   };
 
   const getStateBadge = (state: string) => {
@@ -347,13 +376,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
         </div>
 
         <div className="flex items-center space-x-3">
-          <button
-            onClick={onRefresh}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
-            title="Refresh containers"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <RefreshButton onRefresh={onRefresh} title="Refresh containers" />
 
           {isOperator && (
             <button
@@ -371,7 +394,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
       <div className="p-4 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-2">
           {/* State Filters */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-x-auto max-w-full">
+          <div className="flex flex-wrap bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 max-w-full">
             <button
               onClick={() => setFilterState('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
@@ -453,41 +476,47 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
 
       {/* Main Containers Table */}
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl transition-colors">
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="py-3 px-4 w-10">
+                <th className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
                   <input
                     type="checkbox"
                     checked={
-                      selectedIds.length > 0 && selectedIds.length === filteredContainers.length
+                      selectedIds.length > 0 && selectedIds.length === sortedContainers.length
                     }
                     onChange={handleSelectAll}
                     className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
                   />
                 </th>
-                <th className="py-3 px-4">Container</th>
-                <th className="py-3 px-4">Image</th>
-                <th className="py-3 px-4">State</th>
-                <th className="py-3 px-4">Port Bindings</th>
-                <th className="py-3 px-4">Security</th>
-                <th className="py-3 px-4 text-right">Lifecycle Actions</th>
+                <th className="py-3 px-3 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('name')}>
+                  Container {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3 px-3 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('image')}>
+                  Image {sortConfig.key === 'image' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3 px-3 text-center whitespace-nowrap cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('state')}>
+                  State {sortConfig.key === 'state' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3 px-3 text-center whitespace-nowrap w-[200px]">Port Bindings</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap w-[150px]">Security</th>
+                <th className="py-3 px-3 text-right whitespace-nowrap w-[180px]">Lifecycle Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
-              {filteredContainers.length === 0 ? (
+              {sortedContainers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-zinc-500 font-sans">
                     No containers found matching current criteria.
                   </td>
                 </tr>
               ) : (
-                filteredContainers.map((c) => {
+                sortedContainers.map((c) => {
                   const report = getContainerReport(c);
                   return (
                     <tr key={c.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(c.id)}
@@ -497,154 +526,160 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                       </td>
 
                       {/* Name & ID */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-3 min-w-0">
                         <div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1.5 min-w-0">
                             <button
                               onClick={() => {
                                 handleOpenContainerModal(c, 'overview');
                               }}
-                              className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-blue-500 text-left font-sans text-sm flex items-center space-x-1.5"
+                              className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-blue-500 text-left font-sans text-sm flex items-center min-w-0 max-w-full"
                             >
-                              <span>{c.name}</span>
+                              <span className="truncate max-w-[120px] sm:max-w-[160px] md:max-w-[200px] lg:max-w-xs block" title={c.name}>
+                                {c.name}
+                              </span>
                             </button>
                             {c.isSelf && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform self container">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1 shrink-0 whitespace-nowrap" title="Platform self container">
                                 <ShieldCheck className="w-3 h-3" />
                                 <span>Self</span>
                               </span>
                             )}
                             {c.isProtected && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1" title="Protected against stopping and deletion">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 inline-flex items-center space-x-1 shrink-0 whitespace-nowrap" title="Protected against stopping and deletion">
                                 <Lock className="w-3 h-3" />
                                 <span>Protected</span>
                               </span>
                             )}
                             {c.isHidden && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1" title="Hidden from operators and viewers">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1 shrink-0 whitespace-nowrap" title="Hidden from operators and viewers">
                                 <EyeOff className="w-3 h-3" />
                                 <span>Hidden</span>
                               </span>
                             )}
                             {c.name.match(/-replica-\d+$/) && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1" title="Scaled replica container">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 inline-flex items-center space-x-1 shrink-0 whitespace-nowrap" title="Scaled replica container">
                                 <Boxes className="w-2.5 h-2.5" />
                                 <span>Replica</span>
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-zinc-400 dark:text-zinc-500">{c.shortId}</span>
+                          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 block font-mono truncate">{c.shortId}</span>
                         </div>
                       </td>
 
                       {/* Image */}
-                      <td className="py-3 px-4 text-zinc-700 dark:text-zinc-300 max-w-xs truncate" title={c.image}>
-                        {c.image}
+                      <td className="py-3 px-3 text-zinc-700 dark:text-zinc-300 min-w-0" title={c.image}>
+                        <div className="truncate max-w-[110px] sm:max-w-[150px] md:max-w-[190px] lg:max-w-xs whitespace-nowrap font-mono text-xs">
+                          {c.image}
+                        </div>
                       </td>
 
                       {/* State */}
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStateBadge(c.state)}`}>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border whitespace-nowrap ${getStateBadge(c.state)}`}>
                           {c.state}
                         </span>
                       </td>
 
                       {/* Ports */}
-                      <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
+                      <td className="py-3 px-3 text-center">
                         {c.ports && c.ports.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-nowrap justify-center gap-1">
                             {c.ports.map((p, idx) => (
                               <span
                                 key={idx}
-                                className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px]"
+                                className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] whitespace-nowrap font-mono inline-block shrink-0"
                               >
                                 {p.PublicPort ? `${p.PublicPort} -> ${p.PrivatePort}` : `${p.PrivatePort}`}
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-zinc-400 dark:text-zinc-600">-</span>
+                          <div className="text-center text-zinc-400 dark:text-zinc-600 font-mono">-</div>
                         )}
                       </td>
 
                       {/* Security Scanner Status */}
-                      <td className="py-3 px-4">
-                        {(() => {
-                          const isScanning = scanningMap[c.id] || (report && report.status === 'running');
-                          if (isScanning) {
-                            return (
-                              <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-bold animate-pulse">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span>Scanning...</span>
-                              </div>
-                            );
-                          }
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center w-full whitespace-nowrap">
+                          {(() => {
+                            const isScanning = scanningMap[c.id] || (report && report.status === 'running');
+                            if (isScanning) {
+                              return (
+                                <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-bold animate-pulse whitespace-nowrap shrink-0">
+                                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                  <span className="whitespace-nowrap">Scanning...</span>
+                                </div>
+                              );
+                            }
 
-                          if (report) {
-                            return (
-                              <div className="inline-flex items-center space-x-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedReportId(report.id)}
-                                  title="Click to view interactive Trivy report"
-                                  className="group cursor-pointer focus:outline-none"
-                                >
-                                  {report.criticalCount > 0 ? (
-                                    <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-red-400/50 transition-all flex items-center space-x-1">
-                                      <ShieldAlert className="w-3 h-3 text-red-500" />
-                                      <span>{report.criticalCount} Critical</span>
-                                    </span>
-                                  ) : report.highCount > 0 ? (
-                                    <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-orange-400/50 transition-all flex items-center space-x-1">
-                                      <ShieldAlert className="w-3 h-3 text-orange-500" />
-                                      <span>{report.highCount} High</span>
-                                    </span>
-                                  ) : report.mediumCount > 0 ? (
-                                    <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-yellow-400/50 transition-all flex items-center space-x-1">
-                                      <ShieldAlert className="w-3 h-3 text-yellow-600" />
-                                      <span>{report.mediumCount} Medium</span>
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-emerald-400/50 transition-all flex items-center space-x-1">
-                                      <span>Clean</span>
-                                    </span>
-                                  )}
-                                </button>
-
-                                {isOperator && (
+                            if (report) {
+                              return (
+                                <div className="inline-flex items-center space-x-1.5 whitespace-nowrap shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => handleDirectScan(c)}
-                                    title="Rescan container"
-                                    className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[10px] font-semibold inline-flex items-center space-x-1 transition-colors"
+                                    onClick={() => setSelectedReportId(report.id)}
+                                    title="Click to view interactive Trivy report"
+                                    className="group cursor-pointer focus:outline-none shrink-0"
                                   >
-                                    <RefreshCw className="w-2.5 h-2.5" />
-                                    <span>Rescan</span>
+                                    {report.criticalCount > 0 ? (
+                                      <span className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-red-400/50 transition-all flex items-center space-x-1 whitespace-nowrap shrink-0">
+                                        <ShieldAlert className="w-3 h-3 text-red-500 shrink-0" />
+                                        <span className="whitespace-nowrap">{report.criticalCount} Critical</span>
+                                      </span>
+                                    ) : report.highCount > 0 ? (
+                                      <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-orange-400/50 transition-all flex items-center space-x-1 whitespace-nowrap shrink-0">
+                                        <ShieldAlert className="w-3 h-3 text-orange-500 shrink-0" />
+                                        <span className="whitespace-nowrap">{report.highCount} High</span>
+                                      </span>
+                                    ) : report.mediumCount > 0 ? (
+                                      <span className="px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-yellow-400/50 transition-all flex items-center space-x-1 whitespace-nowrap shrink-0">
+                                        <ShieldAlert className="w-3 h-3 text-yellow-600 shrink-0" />
+                                        <span className="whitespace-nowrap">{report.mediumCount} Medium</span>
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold group-hover:ring-2 group-hover:ring-emerald-400/50 transition-all flex items-center space-x-1 whitespace-nowrap shrink-0">
+                                        <span className="whitespace-nowrap">Clean</span>
+                                      </span>
+                                    )}
                                   </button>
-                                )}
-                              </div>
-                            );
-                          }
 
-                          return isOperator ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDirectScan(c)}
-                              className="text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 font-semibold flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                              title="Start scanning container"
-                            >
-                              <ShieldAlert className="w-3.5 h-3.5 text-blue-500" />
-                              <span>Scan</span>
-                            </button>
-                          ) : (
-                            <span className="text-zinc-400 text-[11px]">Unscanned</span>
-                          );
-                        })()}
+                                  {isOperator && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDirectScan(c)}
+                                      title="Rescan container"
+                                      className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[10px] font-semibold inline-flex items-center space-x-1 transition-colors whitespace-nowrap shrink-0"
+                                    >
+                                      <RefreshCw className="w-2.5 h-2.5 shrink-0" />
+                                      <span className="whitespace-nowrap">Rescan</span>
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return isOperator ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDirectScan(c)}
+                                className="text-[11px] text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 font-semibold inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors whitespace-nowrap shrink-0"
+                                title="Start scanning container"
+                              >
+                                <ShieldAlert className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span className="whitespace-nowrap">Scan</span>
+                              </button>
+                            ) : (
+                              <span className="text-zinc-400 text-[11px] whitespace-nowrap">Unscanned</span>
+                            );
+                          })()}
+                        </div>
                       </td>
 
                       {/* Action buttons */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end space-x-1 shrink-0 whitespace-nowrap">
                           {c.state === 'running' ? (
                             c.isSelf ? (
                               <>
@@ -956,7 +991,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
 
               {/* Tabs Switcher & Desktop Window Controls */}
               <div className="flex items-center justify-between md:justify-end space-x-2 w-full md:w-auto shrink-0 min-w-0">
-                <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold overflow-x-auto min-w-0 max-w-full">
+                <div className="flex flex-wrap bg-zinc-100 dark:bg-zinc-950 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold min-w-0 max-w-full">
                   <button
                     onClick={() => setDetailTab('overview')}
                     className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
@@ -965,7 +1000,7 @@ export const ContainersPage: React.FC<ContainersPageProps> = ({
                   >
                     Overview
                   </button>
-                  {activeContainer.state === 'running' && isOperator && (
+                  {activeContainer.state === 'running' && canAccessExec && (
                     <button
                       onClick={() => setDetailTab('terminal')}
                       className={`px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${

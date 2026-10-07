@@ -16,6 +16,7 @@ import {
   X,
   Server,
   Wrench,
+  Terminal,
 } from 'lucide-react';
 
 export type NavTab =
@@ -29,7 +30,8 @@ export type NavTab =
   | 'users'
   | 'audit'
   | 'host'
-  | 'maintenance';
+  | 'maintenance'
+  | 'ssh';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -53,10 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   counts,
 }) => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canAccessSsh } = useAuth();
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
 
-  const navItems: Array<{ id: NavTab; label: string; icon: React.ReactNode; count?: number; adminOnly?: boolean }> = [
+  const navItems: Array<{ id: NavTab; label: string; icon: React.ReactNode; count?: number; adminOnly?: boolean; allowed?: boolean }> = [
     { id: 'dashboard', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'containers', label: 'Containers', icon: <Box className="w-4 h-4" />, count: counts?.containers },
     { id: 'stacks', label: 'Compose Stacks', icon: <Boxes className="w-4 h-4" />, count: counts?.stacks },
@@ -66,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'security', label: 'Trivy Security', icon: <ShieldAlert className="w-4 h-4" />, count: counts?.reports },
     { id: 'host', label: 'Host Info', icon: <Cpu className="w-4 h-4" /> },
     { id: 'maintenance', label: 'Maintenance', icon: <Wrench className="w-4 h-4" />, adminOnly: true },
+    { id: 'ssh', label: 'SSH Terminal', icon: <Terminal className="w-4 h-4" />, allowed: canAccessSsh },
     { id: 'users', label: 'User RBAC', icon: <Users className="w-4 h-4" />, adminOnly: true },
     { id: 'audit', label: 'Audit Logs', icon: <ScrollText className="w-4 h-4" />, adminOnly: true },
   ];
@@ -86,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <nav className="space-y-1">
             {navItems
-              .filter((item) => !item.adminOnly || isAdmin)
+              .filter((item) => (item.allowed !== undefined ? item.allowed : (!item.adminOnly || isAdmin)))
               .map((item) => {
                 const isActive = activeTab === item.id;
                 return (
@@ -132,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="flex items-center space-x-2">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Manager v0.3.0</span>
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Manager v0.4.0</span>
           </div>
           <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Changelog</span>
         </button>

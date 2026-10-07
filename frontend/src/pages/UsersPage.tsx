@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { User, UserRole } from '../types';
 import { usersApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { RefreshButton } from '../components/common/RefreshButton';
 import {
   Users,
   Plus,
@@ -26,6 +27,9 @@ import {
   Loader2,
   Database,
   FileSpreadsheet,
+  Pencil,
+  Terminal,
+  Server,
 } from 'lucide-react';
 
 interface PreviewUser {
@@ -55,6 +59,19 @@ export const UsersPage: React.FC = () => {
   const [password, setPassword] = useState<string>('');
   const [role, setRole] = useState<UserRole>('operator');
   const [mustChangePassword, setMustChangePassword] = useState<boolean>(true);
+  const [canAccessSsh, setCanAccessSsh] = useState<boolean>(false);
+  const [canAccessExec, setCanAccessExec] = useState<boolean>(true);
+
+  // Edit User Modal
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [isEditMinimized, setIsEditMinimized] = useState<boolean>(false);
+  const [isEditMaximized, setIsEditMaximized] = useState<boolean>(false);
+  const [editEmail, setEditEmail] = useState<string>('');
+  const [editRole, setEditRole] = useState<UserRole>('operator');
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
+  const [editCanAccessSsh, setEditCanAccessSsh] = useState<boolean>(false);
+  const [editCanAccessExec, setEditCanAccessExec] = useState<boolean>(true);
+  const [editSaving, setEditSaving] = useState<boolean>(false);
 
   // Password Reset Modal
   const [resetUser, setResetUser] = useState<User | null>(null);
@@ -94,6 +111,8 @@ export const UsersPage: React.FC = () => {
     loadUsers();
   }, []);
 
+  const sortedUsers = [...users].sort((a, b) => a.username.localeCompare(b.username));
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
@@ -107,15 +126,55 @@ export const UsersPage: React.FC = () => {
         password,
         role,
         mustChangePassword,
+        canAccessSsh: role === 'admin' ? true : (role === 'operator' ? canAccessSsh : false),
+        canAccessExec: role === 'admin' ? true : (role === 'operator' ? canAccessExec : false),
       });
       setIsAddModalOpen(false);
       setUsername('');
       setEmail('');
       setPassword('');
       setMustChangePassword(true);
+      setCanAccessSsh(false);
+      setCanAccessExec(true);
       loadUsers();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create user');
+    }
+  };
+
+  const handleOpenEdit = (u: User) => {
+    setEditUser(u);
+    setIsEditMinimized(false);
+    setIsEditMaximized(false);
+    setEditEmail(u.email || '');
+    setEditRole(u.role);
+    setEditIsActive(Boolean(u.isActive));
+    setEditCanAccessSsh(Boolean(u.canAccessSsh));
+    setEditCanAccessExec(u.canAccessExec !== false);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser) return;
+    if (!editEmail.trim()) {
+      alert('Email address is required.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await usersApi.update(editUser.id, {
+        email: editEmail.trim(),
+        role: editRole,
+        isActive: editIsActive,
+        canAccessSsh: editRole === 'admin' ? true : (editRole === 'operator' ? editCanAccessSsh : false),
+        canAccessExec: editRole === 'admin' ? true : (editRole === 'operator' ? editCanAccessExec : false),
+      });
+      setEditUser(null);
+      loadUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update user');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -394,13 +453,7 @@ export const UsersPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
-          <button
-            onClick={loadUsers}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors"
-            title="Refresh users"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <RefreshButton onRefresh={loadUsers} title="Refresh users" />
 
           <button
             onClick={handleDownloadTemplate}
@@ -466,21 +519,21 @@ export const UsersPage: React.FC = () => {
 
       {/* Users Table */}
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl transition-colors">
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-100 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="py-3 px-4">Username</th>
                 <th className="py-3 px-4">Email</th>
-                <th className="py-3 px-4">Role</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Force PW Reset</th>
-                <th className="py-3 px-4">Created Date</th>
+                <th className="py-3 px-4 text-right w-[180px]">Role</th>
+                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4 text-center hidden sm:table-cell">Force PW Reset</th>
+                <th className="py-3 px-4 hidden md:table-cell">Created Date</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
-              {users.map((u) => {
+              {sortedUsers.map((u) => {
                 const isSelf = u.id === currentUser?.id;
                 const isRoleDisabled = isSelf || isSoleActiveAdmin(u);
                 const isStatusDisabled = isSelf || (isSoleActiveAdmin(u) && Boolean(u.isActive));
@@ -498,23 +551,45 @@ export const UsersPage: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">{u.email || '-'}</td>
-                    <td className="py-3 px-4">
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleUpdateRole(u, e.target.value as UserRole)}
-                        disabled={isRoleDisabled}
-                        title={isRoleDisabled ? 'Cannot change the role of the sole active administrator or yourself' : 'Change role'}
-                        className={`text-xs font-semibold px-2 py-1 rounded-lg border focus:outline-none transition-colors ${getRoleBadge(
-                          u.role
-                        )} ${isRoleDisabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-                      >
-                        <option value="operator">Operator</option>
-                        <option value="viewer">Viewer</option>
-                        <option value="admin">Admin</option>
-                      </select>
+                    <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400 truncate max-w-[140px] sm:max-w-xs">{u.email || '-'}</td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        {/* Capability Icons in front of Role */}
+                        <div className="flex items-center space-x-1 shrink-0">
+                          {(u.role === 'admin' || (u.role === 'operator' && u.canAccessExec !== false)) && (
+                            <span
+                              className="p-1 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                              title="Container Terminal Access (Exec)"
+                            >
+                              <Terminal className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                          {(u.role === 'admin' || (u.role === 'operator' && Boolean(u.canAccessSsh))) && (
+                            <span
+                              className="p-1 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+                              title="SSH Host Terminal Access"
+                            >
+                              <Server className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                        </div>
+
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleUpdateRole(u, e.target.value as UserRole)}
+                          disabled={isRoleDisabled}
+                          title={isRoleDisabled ? 'Cannot change the role of the sole active administrator or yourself' : 'Change role'}
+                          className={`text-xs font-semibold px-2 py-1 rounded-lg border focus:outline-none transition-colors w-24 sm:w-28 shrink-0 text-left ${getRoleBadge(
+                            u.role
+                          )} ${isRoleDisabled ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <option value="operator">Operator</option>
+                          <option value="viewer">Viewer</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
                       <button
                         onClick={() => handleToggleActive(u)}
                         disabled={isStatusDisabled}
@@ -529,7 +604,7 @@ export const UsersPage: React.FC = () => {
                         <span>{u.isActive ? 'Active' : 'Disabled'}</span>
                       </button>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 text-center whitespace-nowrap hidden sm:table-cell">
                       {u.mustChangePassword ? (
                         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold border border-amber-500/20 uppercase">
                           <KeyRound className="w-3 h-3" />
@@ -539,11 +614,18 @@ export const UsersPage: React.FC = () => {
                         <span className="text-zinc-400 text-[11px]">Completed</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-zinc-500">
+                    <td className="py-3 px-4 text-zinc-500 hidden md:table-cell whitespace-nowrap">
                       {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => handleOpenEdit(u)}
+                          title="Edit User & Permissions"
+                          className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => {
                             setResetUser(u);
@@ -608,6 +690,217 @@ export const UsersPage: React.FC = () => {
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
@@ -709,11 +1002,48 @@ export const UsersPage: React.FC = () => {
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
                 >
-                  <option value="operator">Operator (Container & Terminal Access)</option>
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
                   <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
                   <option value="admin">Admin (Full Control)</option>
                 </select>
               </div>
+
+              {/* Operator Capabilities */}
+              {role === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canAccessExec}
+                      onChange={(e) => setCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canAccessSsh}
+                      onChange={(e) => setCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {/* Force Reset Checkbox */}
               <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
@@ -756,6 +1086,217 @@ export const UsersPage: React.FC = () => {
         document.body
       )}
 
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Password Reset Modal */}
       {resetUser && isResetMinimized && createPortal(
         <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
@@ -787,6 +1328,217 @@ export const UsersPage: React.FC = () => {
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
@@ -884,6 +1636,217 @@ export const UsersPage: React.FC = () => {
         document.body
       )}
 
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Bulk Import & Validation Preview Modal */}
       {isBulkModalOpen && isBulkMinimized && createPortal(
         <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
@@ -915,6 +1878,217 @@ export const UsersPage: React.FC = () => {
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body
@@ -1197,6 +2371,217 @@ export const UsersPage: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Edit User Modal */}
+      {editUser && isEditMinimized && createPortal(
+        <div className="fixed bottom-5 right-5 z-[100] bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-3 flex items-center space-x-3 text-xs animate-in slide-in-from-bottom-5">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20">
+              <Pencil className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-zinc-900 dark:text-white">Edit User</p>
+              <p className="text-[10px] text-zinc-400">{editUser.username}</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+            <button
+              onClick={() => setIsEditMinimized(false)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Restore window"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setEditUser(null);
+                setIsEditMinimized(false);
+                setIsEditMaximized(false);
+              }}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {editUser && !isEditMinimized && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className={`bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 transition-all overflow-hidden flex flex-col ${
+            isEditMaximized ? 'w-full h-full inset-0 rounded-none' : 'rounded-2xl max-w-md w-full'
+          }`}>
+            <div className="px-4 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="p-2 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-xl border border-blue-500/20 shrink-0">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white truncate">Edit User & Permissions</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">Modify account details and terminal capabilities for {editUser.username}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditMinimized(true)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Minimize"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMaximized(!isEditMaximized)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isEditMaximized ? "Restore" : "Maximize"}
+                >
+                  {isEditMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editUser.username}
+                  className="w-full bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Role Permission
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  disabled={editUser.id === currentUser?.id || isSoleActiveAdmin(editUser)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-xl p-2.5 text-zinc-900 dark:text-zinc-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="operator">Operator (Container Lifecycle Management)</option>
+                  <option value="viewer">Viewer (Read-Only Logs & Stats)</option>
+                  <option value="admin">Admin (Full Control)</option>
+                </select>
+              </div>
+
+              {/* Terminal Capabilities for Operator */}
+              {editRole === 'operator' && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Terminal Capabilities
+                  </div>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessExec}
+                      onChange={(e) => setEditCanAccessExec(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Terminal className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        Container Terminal Access (Exec)
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editCanAccessSsh}
+                      onChange={(e) => setEditCanAccessSsh(e.target.checked)}
+                      className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-sky-600 focus:ring-0"
+                    />
+                    <div className="flex items-center space-x-1.5 text-xs">
+                      <Server className="w-3.5 h-3.5 text-sky-500" />
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                        SSH Host Terminal Access
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Toggle */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editIsActive}
+                    disabled={editUser.id === currentUser?.id || (isSoleActiveAdmin(editUser) && editIsActive)}
+                    onChange={(e) => setEditIsActive(e.target.checked)}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50"
+                  />
+                  <div>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 block">
+                      Account Status: {editIsActive ? 'Active' : 'Disabled'}
+                    </span>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                      Inactive users cannot log into Container Manager.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditUser(null);
+                    setIsEditMinimized(false);
+                    setIsEditMaximized(false);
+                  }}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-600/30 flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

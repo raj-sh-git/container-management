@@ -78,6 +78,8 @@ export const usersApi = {
     password: string;
     role: string;
     mustChangePassword?: boolean;
+    canAccessSsh?: boolean;
+    canAccessExec?: boolean;
   }): Promise<User> => {
     const res = await api.post<User>('/users', data);
     return res.data;
@@ -285,6 +287,22 @@ export const securityApi = {
     const res = await api.delete(`/security/reports/${id}`);
     return res.data;
   },
+  batchDeleteReports: async (ids: string[]) => {
+    const res = await api.post<{ success: boolean; count: number }>('/security/reports/batch-delete', { ids });
+    return res.data;
+  },
+  downloadReportsZip: async (ids: string[]) => {
+    const res = await api.post('/security/reports/batch-download', { ids }, { responseType: 'blob' });
+    const blob = new Blob([res.data], { type: 'application/zip' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trivy-reports-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 // ==================== SYSTEM ====================
@@ -301,8 +319,8 @@ export const systemApi = {
     const res = await api.get('/system/version');
     return res.data;
   },
-  df: async (): Promise<any> => {
-    const res = await api.get('/system/df');
+  df: async (fresh: boolean = false): Promise<any> => {
+    const res = await api.get('/system/df', { params: fresh ? { fresh: 'true' } : {} });
     return res.data;
   },
   prune: async (options: { all?: boolean; volumes?: boolean }) => {

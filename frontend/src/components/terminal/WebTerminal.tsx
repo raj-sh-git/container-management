@@ -13,7 +13,7 @@ interface WebTerminalProps {
 }
 
 export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, containerName }) => {
-  const { token, isOperator } = useAuth();
+  const { token, canAccessExec } = useAuth();
   const terminalRef = useRef<HTMLDivElement>(null);
   const termInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -24,7 +24,7 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const connect = () => {
-    if (!token || !isOperator) return;
+    if (!token || !canAccessExec) return;
 
     setStatus('connecting');
     setErrorMessage('');
@@ -167,13 +167,13 @@ export const WebTerminal: React.FC<WebTerminalProps> = ({ containerId, container
     };
   }, [containerId, shell]);
 
-  if (!isOperator) {
+  if (!canAccessExec) {
     return (
       <div className="p-8 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col items-center justify-center text-center">
         <ShieldAlert className="w-12 h-12 text-yellow-500 mb-3" />
         <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">Terminal Access Restricted</h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">
-          Your role (Viewer) does not permit interactive shell sessions inside running containers.
+          Interactive container terminal access is not permitted for your user account.
         </p>
       </div>
     );

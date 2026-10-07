@@ -12,6 +12,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isOperator: boolean;
   isViewer: boolean;
+  canAccessSsh: boolean;
+  canAccessExec: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = user?.role === 'admin';
   const isOperator = user?.role === 'admin' || user?.role === 'operator';
   const isViewer = !!user;
+  const canAccessSsh = isAdmin || (user?.role === 'operator' && Boolean(user?.canAccessSsh));
+  const canAccessExec = isAdmin || (user?.role === 'operator' && user?.canAccessExec !== false);
 
   return (
     <AuthContext.Provider
@@ -75,6 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         isOperator,
         isViewer,
+        canAccessSsh,
+        canAccessExec,
       }}
     >
       {children}

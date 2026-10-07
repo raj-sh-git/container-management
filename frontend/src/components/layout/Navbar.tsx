@@ -6,23 +6,20 @@ import {
   Server,
   User as UserIcon,
   LogOut,
-  RefreshCw,
   Sun,
   Moon,
   Menu,
   X,
 } from 'lucide-react';
 
-const APP_VERSION = 'v0.3.0';
+const APP_VERSION = 'v0.4.0';
 
 interface NavbarProps {
-  onRefresh?: () => void;
   onToggleMobileMenu?: () => void;
   isMobileMenuOpen?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  onRefresh,
   onToggleMobileMenu,
   isMobileMenuOpen,
 }) => {
@@ -122,16 +119,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-600" />}
         </button>
-
-        {onRefresh && (
-          <button
-            onClick={onRefresh}
-            title="Refresh engine state"
-            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
 
         <div className="h-5 sm:h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
 

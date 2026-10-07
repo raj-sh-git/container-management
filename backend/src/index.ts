@@ -25,15 +25,17 @@ import scalingRoutes from './routes/scaling.routes';
 import { handleExecWs } from './websocket/exec';
 import { handleLogsWs } from './websocket/logs';
 import { handleStatsWs } from './websocket/stats';
+import { handleSshWs } from './websocket/ssh';
 import { cleanupSchedulerService } from './services/cleanup-scheduler.service';
 import { autoscalerService } from './services/autoscaler.service';
 
 // Helper to match WebSocket endpoint from pathname (supports sub-paths like /cce/ws/exec or /ws/exec)
-function getWsEndpoint(pathname: string | null): 'exec' | 'logs' | 'stats' | null {
+function getWsEndpoint(pathname: string | null): 'exec' | 'logs' | 'stats' | 'ssh' | null {
   if (!pathname) return null;
   if (pathname.endsWith('/ws/exec')) return 'exec';
   if (pathname.endsWith('/ws/logs')) return 'logs';
   if (pathname.endsWith('/ws/stats')) return 'stats';
+  if (pathname.endsWith('/ws/ssh')) return 'ssh';
   return null;
 }
 
@@ -167,11 +169,24 @@ async function bootstrap() {
         return;
       }
 
-      // Check role permissions: Viewer cannot open exec terminal
-      if (endpoint === 'exec' && auth.user.role === 'viewer') {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-        socket.destroy();
-        return;
+      // Check role permissions: Exec terminal requires Admin or Operator with canAccessExec permission
+      if (endpoint === 'exec') {
+        const canExec = auth.user.role === 'admin' || (auth.user.role === 'operator' && auth.user.canAccessExec !== false);
+        if (!canExec) {
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+      }
+
+      // Check role permissions: SSH terminal requires Admin or Operator with canAccessSsh permission
+      if (endpoint === 'ssh') {
+        const canSsh = auth.user.role === 'admin' || (auth.user.role === 'operator' && Boolean(auth.user.canAccessSsh));
+        if (!canSsh) {
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+          socket.destroy();
+          return;
+        }
       }
 
       wss.handleUpgrade(request, socket, head, (ws) => {
@@ -185,6 +200,14 @@ async function bootstrap() {
   wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
     const { pathname, query } = url.parse(request.url || '', true);
     const endpoint = getWsEndpoint(pathname);
+
+    // Handle SSH terminal session
+    if (endpoint === 'ssh') {
+      const auth = authenticateWs(request.url || '');
+      handleSshWs(ws, auth.user);
+      return;
+    }
+
     const containerId = query.containerId as string;
 
     if (!containerId) {

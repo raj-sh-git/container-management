@@ -7,6 +7,8 @@ export interface User {
   role: UserRole;
   isActive?: boolean;
   mustChangePassword?: boolean;
+  canAccessSsh?: boolean;
+  canAccessExec?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -304,3 +306,12 @@ export interface HostMetrics {
 
 
 
+
+export interface SshProfile {
+  id: string;
+  host: string;
+  port: number;
+  username: string;
+  authMethod: 'password' | 'key';
+  lastConnected?: string;
+}

@@ -30,6 +30,8 @@ reports/
 **/reports/
 trivy-cache/
 **/trivy-cache/
+trivy-report-*.html
+*.zip
 
 # Environment Variables & Secrets
 .env

@@ -21,6 +21,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response) => {
       role: schema.users.role,
       isActive: schema.users.isActive,
       mustChangePassword: schema.users.mustChangePassword,
+      canAccessSsh: schema.users.canAccessSsh,
+      canAccessExec: schema.users.canAccessExec,
       createdAt: schema.users.createdAt,
       updatedAt: schema.users.updatedAt,
     })
@@ -38,7 +40,7 @@ router.get('/backup', async (req: AuthenticatedRequest, res: Response) => {
     await logAudit(req, 'USER_BACKUP', 'system', 'users', `Exported backup of ${allUsers.length} users.`);
     res.json({
       platform: 'Container Manager',
-      version: '0.3.0',
+      version: '0.4.0',
       exportedAt: new Date().toISOString(),
       count: allUsers.length,
       users: allUsers.map((u) => ({
@@ -47,6 +49,8 @@ router.get('/backup', async (req: AuthenticatedRequest, res: Response) => {
         role: u.role,
         isActive: Boolean(u.isActive),
         mustChangePassword: Boolean(u.mustChangePassword),
+        canAccessSsh: Boolean(u.canAccessSsh),
+        canAccessExec: Boolean(u.canAccessExec),
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
         passwordHash: u.passwordHash,
@@ -104,6 +108,9 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response): Promise<v
       const mustChangePassword = u.mustChangePassword !== undefined ? Boolean(u.mustChangePassword) : true;
       const isActive = u.isActive !== undefined ? Boolean(u.isActive) : true;
 
+      const canAccessSsh = u.canAccessSsh !== undefined ? Boolean(u.canAccessSsh) : role === 'admin';
+      const canAccessExec = u.canAccessExec !== undefined ? Boolean(u.canAccessExec) : role !== 'viewer';
+
       if (existing) {
         db.update(schema.users)
           .set({
@@ -112,6 +119,8 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response): Promise<v
             passwordHash,
             isActive,
             mustChangePassword,
+            canAccessSsh,
+            canAccessExec,
             updatedAt: now,
           })
           .where(eq(schema.users.id, existing.id))
@@ -126,6 +135,8 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response): Promise<v
           role: role as 'admin' | 'operator' | 'viewer',
           isActive,
           mustChangePassword,
+          canAccessSsh,
+          canAccessExec,
           createdAt: now,
           updatedAt: now,
         }).run();
@@ -155,7 +166,7 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response): Promise<v
 });
 
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const { username, email, password, role = 'operator', mustChangePassword = true } = req.body;
+  const { username, email, password, role = 'operator', mustChangePassword = true, canAccessSsh, canAccessExec } = req.body;
 
   if (!username || !password || !email || !email.trim()) {
     res.status(400).json({ error: 'Username, email, and password are required.' });
@@ -172,6 +183,9 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
   const now = new Date().toISOString();
   const userId = crypto.randomUUID();
 
+  const finalCanAccessSsh = role === 'admin' ? true : (role === 'viewer' ? false : Boolean(canAccessSsh));
+  const finalCanAccessExec = role === 'admin' ? true : (role === 'viewer' ? false : (canAccessExec !== undefined ? Boolean(canAccessExec) : true));
+
   db.insert(schema.users).values({
     id: userId,
     username,
@@ -180,6 +194,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     role: role as 'admin' | 'operator' | 'viewer',
     isActive: true,
     mustChangePassword: Boolean(mustChangePassword),
+    canAccessSsh: finalCanAccessSsh,
+    canAccessExec: finalCanAccessExec,
     createdAt: now,
     updatedAt: now,
   }).run();
@@ -193,13 +209,15 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     role,
     isActive: true,
     mustChangePassword: Boolean(mustChangePassword),
+    canAccessSsh: finalCanAccessSsh,
+    canAccessExec: finalCanAccessExec,
     createdAt: now,
   });
 });
 
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { email, role, isActive, password, mustChangePassword } = req.body;
+  const { email, role, isActive, password, mustChangePassword, canAccessSsh, canAccessExec } = req.body;
 
   const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
   if (!user) {
@@ -247,6 +265,20 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
   if (role !== undefined) updates.role = role;
   if (isActive !== undefined) updates.isActive = isActive;
   if (mustChangePassword !== undefined) updates.mustChangePassword = Boolean(mustChangePassword);
+
+  const targetRole = role !== undefined ? role : user.role;
+  if (targetRole === 'admin') {
+    updates.canAccessSsh = true;
+    updates.canAccessExec = true;
+  } else if (targetRole === 'viewer') {
+    updates.canAccessSsh = false;
+    updates.canAccessExec = false;
+  } else {
+    // operator
+    if (canAccessSsh !== undefined) updates.canAccessSsh = Boolean(canAccessSsh);
+    if (canAccessExec !== undefined) updates.canAccessExec = Boolean(canAccessExec);
+  }
+
   if (password) {
     updates.passwordHash = await bcrypt.hash(password, 10);
     if (mustChangePassword === undefined) {

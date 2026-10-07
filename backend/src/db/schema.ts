@@ -8,6 +8,8 @@ export const users = sqliteTable('users', {
   role: text('role', { enum: ['admin', 'operator', 'viewer'] }).notNull().default('operator'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   mustChangePassword: integer('must_change_password', { mode: 'boolean' }).notNull().default(true),
+  canAccessSsh: integer('can_access_ssh', { mode: 'boolean' }).notNull().default(false),
+  canAccessExec: integer('can_access_exec', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

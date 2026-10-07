@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { AuditLog } from '../types';
 import { systemApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { RefreshCw, Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshButton } from '../components/common/RefreshButton';
+import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const AuditPage: React.FC = () => {
   const { isAdmin } = useAuth();
@@ -43,14 +44,16 @@ export const AuditPage: React.FC = () => {
     }
   };
 
-  const filtered = logs.filter((l) =>
-    search
-      ? l.action.toLowerCase().includes(search.toLowerCase()) ||
-        l.username.toLowerCase().includes(search.toLowerCase()) ||
-        (l.details && l.details.toLowerCase().includes(search.toLowerCase())) ||
-        (l.resourceId && l.resourceId.toLowerCase().includes(search.toLowerCase()))
-      : true
-  );
+  const filtered = [...logs]
+    .filter((l) =>
+      search
+        ? l.action.toLowerCase().includes(search.toLowerCase()) ||
+          l.username.toLowerCase().includes(search.toLowerCase()) ||
+          (l.details && l.details.toLowerCase().includes(search.toLowerCase())) ||
+          (l.resourceId && l.resourceId.toLowerCase().includes(search.toLowerCase()))
+        : true
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.id.localeCompare(a.id));
 
   // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -73,13 +76,7 @@ export const AuditPage: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3">
-          <button
-            onClick={loadLogs}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors shadow-sm"
-            title="Refresh audit logs"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <RefreshButton onRefresh={loadLogs} title="Refresh audit logs" />
 
           {isAdmin && (
             <button
@@ -135,16 +132,16 @@ export const AuditPage: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl transition-colors">
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-100 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">User</th>
-                <th className="py-3 px-4">Action</th>
-                <th className="py-3 px-4">Resource</th>
-                <th className="py-3 px-4">IP Address</th>
-                <th className="py-3 px-4">Details</th>
+                <th className="py-3 px-3 hidden sm:table-cell whitespace-nowrap">Timestamp</th>
+                <th className="py-3 px-3 whitespace-nowrap">User</th>
+                <th className="py-3 px-3 text-left whitespace-nowrap">Action</th>
+                <th className="py-3 px-3 hidden md:table-cell">Resource</th>
+                <th className="py-3 px-3 hidden lg:table-cell">IP Address</th>
+                <th className="py-3 px-3">Details</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
@@ -157,21 +154,21 @@ export const AuditPage: React.FC = () => {
               ) : (
                 paginatedLogs.map((l) => (
                   <tr key={l.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400 font-sans">
+                    <td className="py-3 px-3 text-zinc-600 dark:text-zinc-400 font-sans hidden sm:table-cell whitespace-nowrap">
                       {new Date(l.createdAt).toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200 font-sans">{l.username}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                    <td className="py-3 px-3 font-bold text-zinc-900 dark:text-zinc-200 font-sans whitespace-nowrap">{l.username}</td>
+                    <td className="py-3 px-3 text-left whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-[10px] text-blue-600 dark:text-blue-400 font-bold whitespace-nowrap">
                         {l.action}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-zinc-700 dark:text-zinc-400 font-sans">
+                    <td className="py-3 px-3 text-zinc-700 dark:text-zinc-400 font-sans hidden md:table-cell">
                       {l.resourceType} {l.resourceId ? `(${l.resourceId.substring(0, 12)})` : ''}
                     </td>
-                    <td className="py-3 px-4 text-zinc-500">{l.ipAddress || 'local'}</td>
-                    <td className="py-3 px-4 text-zinc-700 dark:text-zinc-300 font-sans max-w-sm truncate" title={l.details || ''}>
-                      {l.details || '-'}
+                    <td className="py-3 px-3 text-zinc-500 hidden lg:table-cell">{l.ipAddress || 'local'}</td>
+                    <td className="py-3 px-3 text-zinc-700 dark:text-zinc-300 font-sans min-w-0" title={l.details || ''}>
+                      <span className="truncate max-w-[140px] sm:max-w-xs md:max-w-sm block">{l.details || '-'}</span>
                     </td>
                   </tr>
                 ))

@@ -60,7 +60,7 @@ export function getApiUrl(subpath: string = ''): string {
  * Construct WebSocket URL respecting host, protocol, sub-path prefix, and query params.
  */
 export function getWsUrl(
-  endpoint: 'exec' | 'logs' | 'stats',
+  endpoint: 'exec' | 'logs' | 'stats' | 'ssh',
   params: Record<string, string | number | boolean | undefined | null> = {}
 ): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

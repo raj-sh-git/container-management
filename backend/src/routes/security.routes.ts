@@ -105,4 +105,43 @@ router.delete('/reports/:id', requireOperator, async (req: AuthenticatedRequest,
   }
 });
 
+// Download multiple reports in a single ZIP archive
+router.post('/reports/batch-download', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'ids array is required.' });
+      return;
+    }
+    const zipBuffer = await scannerService.createReportsZip(ids);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="trivy-reports-${Date.now()}.zip"`);
+    res.send(zipBuffer);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate reports zip' });
+  }
+});
+
+// Delete multiple reports in batch
+router.post('/reports/batch-delete', requireOperator, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'ids array is required.' });
+      return;
+    }
+    let count = 0;
+    for (const id of ids) {
+      const success = await scannerService.deleteReport(id);
+      if (success) {
+        count++;
+        await logAudit(req, 'REPORT_DELETE', 'report', id);
+      }
+    }
+    res.json({ success: true, count, message: `Deleted ${count} reports` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete reports' });
+  }
+});
+
 export default router;

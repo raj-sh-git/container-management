@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SystemInfo, HostMetrics } from '../types';
 import { systemApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { RefreshButton } from '../components/common/RefreshButton';
 import {
   Server,
   Layers,
@@ -17,39 +18,65 @@ import {
 
 interface HostPageProps {
   systemInfo: SystemInfo | null;
+  diskUsage?: any;
+  onUpdateDiskUsage?: (data: any) => void;
   onRefresh: () => void;
   onNavigateToMaintenance?: () => void;
 }
 
-export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNavigateToMaintenance }) => {
+let moduleCachedDiskUsage: any = null;
+let moduleCachedMetrics: HostMetrics | null = null;
+
+export const HostPage: React.FC<HostPageProps> = ({
+  systemInfo,
+  diskUsage: propDiskUsage,
+  onUpdateDiskUsage,
+  onRefresh,
+  onNavigateToMaintenance,
+}) => {
   const { isAdmin } = useAuth();
-  const [diskUsage, setDiskUsage] = useState<any>(null);
-  const [metrics, setMetrics] = useState<HostMetrics | null>(null);
+  const [diskUsage, setDiskUsage] = useState<any>(
+    propDiskUsage || moduleCachedDiskUsage || null
+  );
+  const [metrics, setMetrics] = useState<HostMetrics | null>(
+    moduleCachedMetrics || null
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
-  const loadDf = async () => {
+  // Keep state in sync if prop changes
+  useEffect(() => {
+    if (propDiskUsage) {
+      moduleCachedDiskUsage = propDiskUsage;
+      setDiskUsage(propDiskUsage);
+    }
+  }, [propDiskUsage]);
+
+  const loadDf = async (fresh: boolean = false) => {
     try {
-      const data = await systemApi.df();
+      const data = await systemApi.df(fresh);
+      moduleCachedDiskUsage = data;
       setDiskUsage(data);
+      if (onUpdateDiskUsage) onUpdateDiskUsage(data);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load disk usage:', err);
     }
   };
 
   const loadMetrics = async () => {
     try {
       const data = await systemApi.hostMetrics();
+      moduleCachedMetrics = data;
       setMetrics(data);
     } catch (err) {
       console.error('Failed to load host metrics', err);
     }
   };
 
-  const refreshAll = async () => {
+  const refreshAll = async (fresh: boolean = false) => {
     setLoading(true);
     try {
-      await Promise.allSettled([loadDf(), loadMetrics()]);
+      await Promise.allSettled([loadDf(fresh), loadMetrics()]);
       onRefresh();
     } finally {
       setLoading(false);
@@ -57,7 +84,9 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNav
   };
 
   useEffect(() => {
-    refreshAll();
+    // Revalidate data silently without resetting UI
+    loadDf(false);
+    loadMetrics();
   }, []);
 
   useEffect(() => {
@@ -119,14 +148,9 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNav
           </p>
         </div>
 
-        <button
-          onClick={refreshAll}
-          disabled={loading}
-          className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl transition-colors self-start sm:self-auto disabled:opacity-50"
-          title="Refresh host metrics"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center space-x-2">
+          <RefreshButton onRefresh={() => refreshAll(true)} title="Refresh host metrics" />
+        </div>
       </div>
 
       {/* SECTION 1: Host CPU & Memory Usages */}
@@ -366,7 +390,7 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNav
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center text-zinc-600 dark:text-zinc-400 text-xs">
+          <div className="p-8 text-center min-h-[400px] flex flex-col items-center justify-center text-zinc-600 dark:text-zinc-400 text-xs">
             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-zinc-400" />
             <span>Gathering host CPU and memory telemetry...</span>
           </div>
@@ -410,32 +434,32 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNav
       )}
 
       {/* Disk Space Breakdown */}
-      {diskUsage && (
-        <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
-                <HardDrive className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Engine Disk Usage</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Total space consumed by images, containers, and volumes</p>
-              </div>
+      <div className="p-4 sm:p-6 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl space-y-4 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-amber-500/10 text-amber-500 dark:text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
+              <HardDrive className="w-5 h-5" />
             </div>
-
-            {isAdmin && (
-              <button
-                onClick={handleOpenMaintenance}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 text-xs font-semibold transition-all self-start sm:self-auto"
-                title="Open Maintenance to clean up or schedule garbage collection"
-              >
-                <Wrench className="w-3.5 h-3.5" />
-                <span>Go to Maintenance</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <div>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white">Engine Disk Usage</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Total space consumed by images, containers, and volumes</p>
+            </div>
           </div>
 
+          {isAdmin && (
+            <button
+              onClick={handleOpenMaintenance}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 text-xs font-semibold transition-all self-start sm:self-auto"
+              title="Open Maintenance to clean up or schedule garbage collection"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>Go to Maintenance</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {diskUsage ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
               <div className="flex items-center justify-between">
@@ -485,8 +509,20 @@ export const HostPage: React.FC<HostPageProps> = ({ systemInfo, onRefresh, onNav
               </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="h-4 w-20 bg-zinc-200 dark:bg-zinc-800 rounded" />
+                  <div className="h-3 w-12 bg-zinc-200 dark:bg-zinc-800 rounded" />
+                </div>
+                <div className="h-7 w-28 bg-zinc-200 dark:bg-zinc-800 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -62,4 +62,9 @@ coverage
 .cache
 tmp
 temp
+scratch
+test-compose.yml
+trivy-report-*.html
+*.zip
+CHANGELOG.md
 

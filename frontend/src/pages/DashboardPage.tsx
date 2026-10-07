@@ -18,6 +18,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { NavTab } from '../components/layout/Sidebar';
+import { RefreshButton } from '../components/common/RefreshButton';
 
 interface DashboardPageProps {
   systemInfo: SystemInfo | null;
@@ -26,6 +27,7 @@ interface DashboardPageProps {
   volumes: DockerVolume[];
   networks: DockerNetwork[];
   reports: ScanReport[];
+  onRefresh?: () => void;
   onSelectTab: (tab: NavTab) => void;
   onOpenCreateContainer: () => void;
   onOpenScanModal: () => void;
@@ -39,6 +41,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   volumes,
   networks,
   reports,
+  onRefresh,
   onSelectTab,
   onOpenCreateContainer,
   onOpenScanModal,
@@ -73,6 +76,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
         {/* Quick Action Buttons */}
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          {onRefresh && <RefreshButton onRefresh={onRefresh} title="Refresh infrastructure overview" />}
+
           <button
             onClick={onOpenScanModal}
             className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3 sm:px-3.5 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold transition-all shadow-sm"
@@ -230,43 +235,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             No running containers. Deploy or start a container to monitor live.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="text-zinc-500 uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="py-3 px-4">Container</th>
-                  <th className="py-3 px-4">Image</th>
-                  <th className="py-3 px-4">Ports</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Quick Actions</th>
+                  <th className="py-3 px-3">Container</th>
+                  <th className="py-3 px-3 hidden sm:table-cell">Image</th>
+                  <th className="py-3 px-3 hidden md:table-cell">Ports</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">Status</th>
+                  <th className="py-3 px-3 text-right whitespace-nowrap">Quick Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
                 {runningContainers.slice(0, 6).map((c) => (
                   <tr key={c.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-3 min-w-0">
                       <button
                         onClick={() => onSelectContainer(c, 'overview')}
-                        className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-blue-500 text-left font-sans"
+                        className="font-bold text-zinc-900 dark:text-zinc-200 hover:text-blue-500 text-left font-sans truncate max-w-[130px] sm:max-w-xs block"
                       >
                         {c.name}
                       </button>
                     </td>
-                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400 truncate max-w-xs">{c.image}</td>
-                    <td className="py-3 px-4 text-zinc-500 dark:text-zinc-400">
+                    <td className="py-3 px-3 text-zinc-500 dark:text-zinc-400 truncate max-w-[130px] sm:max-w-xs hidden sm:table-cell">{c.image}</td>
+                    <td className="py-3 px-3 text-zinc-500 dark:text-zinc-400 hidden md:table-cell">
                       {c.ports && c.ports.length > 0
                         ? c.ports
                             .map((p) => (p.PublicPort ? `${p.PublicPort}:${p.PrivatePort}` : `${p.PrivatePort}`))
                             .join(', ')
                         : '-'}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase">
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase whitespace-nowrap">
                         Running
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end space-x-2 shrink-0">
                         <button
                           onClick={() => onSelectContainer(c, 'terminal')}
                           title="Open Terminal"

@@ -9,6 +9,8 @@ export interface AuthUser {
   id: string;
   username: string;
   role: 'admin' | 'operator' | 'viewer';
+  canAccessSsh?: boolean;
+  canAccessExec?: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -38,6 +40,8 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
       id: user.id,
       username: user.username,
       role: user.role as 'admin' | 'operator' | 'viewer',
+      canAccessSsh: user.role === 'admin' ? true : Boolean(user.canAccessSsh),
+      canAccessExec: user.role === 'admin' ? true : Boolean(user.canAccessExec),
     };
     next();
   } catch (err) {

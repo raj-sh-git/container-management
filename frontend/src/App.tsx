@@ -15,6 +15,7 @@ import { UsersPage } from './pages/UsersPage';
 import { AuditPage } from './pages/AuditPage';
 import { HostPage } from './pages/HostPage';
 import { MaintenancePage } from './pages/MaintenancePage';
+import { SshPage } from './pages/SshPage';
 import { CreateContainerModal } from './components/containers/CreateContainerModal';
 import { ScanModal } from './components/security/ScanModal';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
@@ -50,6 +51,7 @@ const VALID_TABS: NavTab[] = [
   'audit',
   'host',
   'maintenance',
+  'ssh',
 ];
 
 const getInitialTab = (): NavTab => {
@@ -61,9 +63,10 @@ const getInitialTab = (): NavTab => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, loading: authLoading, isAdmin, canAccessSsh } = useAuth();
   const [activeTab, setActiveTabState] = useState<NavTab>(getInitialTab);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [returnTab, setReturnTab] = useState<NavTab | null>(null);
 
   const setActiveTab = (tab: NavTab) => {
     setActiveTabState(tab);
@@ -94,6 +97,7 @@ const AppContent: React.FC = () => {
   const [networks, setNetworks] = useState<DockerNetwork[]>([]);
   const [reports, setReports] = useState<ScanReport[]>([]);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [diskUsage, setDiskUsage] = useState<any>(null);
 
   // Modals & Navigation targets
   const [isCreateContainerOpen, setIsCreateContainerOpen] = useState<boolean>(false);
@@ -131,6 +135,16 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const refreshReports = async () => {
+    if (!user) return;
+    try {
+      const rep = await securityApi.listReports();
+      setReports(rep);
+    } catch (err) {
+      console.error('Error refreshing security reports:', err);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchAllData();
@@ -155,6 +169,7 @@ const AppContent: React.FC = () => {
   }
 
   const handleSelectContainerFromDashboard = (c: Container, tab?: string) => {
+    setReturnTab(activeTab);
     setSelectedContainerForDetail(c);
     setInitialDetailTab(tab || 'overview');
     setActiveTab('containers');
@@ -173,7 +188,6 @@ const AppContent: React.FC = () => {
   return (
     <div className="h-screen bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-[#f4f4f5] flex flex-col font-sans transition-colors duration-200 overflow-hidden">
       <Navbar
-        onRefresh={fetchAllData}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
@@ -198,7 +212,13 @@ const AppContent: React.FC = () => {
           }}
         />
 
-        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full overflow-y-auto min-w-0 h-full">
+        <main
+          className={`flex-1 w-full min-w-0 overflow-x-hidden ${
+            activeTab === 'ssh'
+              ? 'h-[calc(100vh-4rem)] p-3 sm:p-4 md:p-6 overflow-hidden flex flex-col'
+              : 'h-full p-3 sm:p-6 md:p-8 overflow-y-auto'
+          }`}
+        >
           {activeTab === 'dashboard' && (
             <DashboardPage
               systemInfo={systemInfo}
@@ -207,6 +227,7 @@ const AppContent: React.FC = () => {
               volumes={volumes}
               networks={networks}
               reports={reports}
+              onRefresh={fetchAllData}
               onSelectTab={(t) => {
                 setActiveTab(t);
                 setIsMobileMenuOpen(false);
@@ -231,6 +252,13 @@ const AppContent: React.FC = () => {
               onOpenScanModal={handleOpenScanWithTarget}
               selectedContainerForDetail={selectedContainerForDetail}
               initialDetailTab={initialDetailTab}
+              onCloseDetail={() => {
+                setSelectedContainerForDetail(null);
+                if (returnTab && returnTab !== 'containers') {
+                  setActiveTab(returnTab);
+                  setReturnTab(null);
+                }
+              }}
             />
           )}
 
@@ -248,6 +276,7 @@ const AppContent: React.FC = () => {
               containers={containers}
               reports={reports}
               onRefresh={fetchAllData}
+              onRefreshReports={refreshReports}
               onOpenScanModal={handleOpenScanWithTarget}
             />
           )}
@@ -278,6 +307,8 @@ const AppContent: React.FC = () => {
           {activeTab === 'host' && (
             <HostPage
               systemInfo={systemInfo}
+              diskUsage={diskUsage}
+              onUpdateDiskUsage={setDiskUsage}
               onRefresh={fetchAllData}
               onNavigateToMaintenance={() => setActiveTab('maintenance')}
             />
@@ -286,6 +317,10 @@ const AppContent: React.FC = () => {
           {activeTab === 'maintenance' && (
             <MaintenancePage onRefresh={fetchAllData} />
           )}
+
+          <div className={activeTab === 'ssh' && canAccessSsh ? 'h-full flex flex-col flex-1 min-h-0' : 'hidden'}>
+            <SshPage />
+          </div>
         </main>
       </div>
 

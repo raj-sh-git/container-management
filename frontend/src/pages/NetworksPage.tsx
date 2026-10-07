@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { DockerNetwork, Container } from '../types';
 import { networksApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Network, Plus, Trash2, Search, RefreshCw, X, Link, Unlink, Eye, ShieldCheck } from 'lucide-react';
+import { Network, Plus, Trash2, Search, X, Link, Unlink, Eye, ShieldCheck } from 'lucide-react';
+import { RefreshButton } from '../components/common/RefreshButton';
 
 interface NetworksPageProps {
   networks: DockerNetwork[];
@@ -13,6 +14,8 @@ interface NetworksPageProps {
 export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers, onRefresh }) => {
   const { isOperator } = useAuth();
   const [search, setSearch] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'Name', direction: 'asc' });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [networkName, setNetworkName] = useState<string>('');
   const [driver, setDriver] = useState<string>('bridge');
@@ -72,7 +75,49 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
     }
   };
 
+
+  const sorted = [...filtered].sort((a: any, b: any) => {
+    const valA = a[sortConfig.key] || '';
+    const valB = b[sortConfig.key] || '';
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB);
+      if (cmp !== 0) return sortConfig.direction === 'asc' ? cmp : -cmp;
+    } else {
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return a.Name.localeCompare(b.Name) || (a.Id || '').localeCompare(b.Id || '');
+  });
+
+  const deletableNetworks = sorted.filter(n => !['bridge', 'host', 'none'].includes(n.Name) && !n.isSelf);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === deletableNetworks.length && deletableNetworks.length > 0) setSelectedIds([]);
+    else setSelectedIds(deletableNetworks.map(n => n.Id));
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleBatchDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.length} networks?`)) return;
+    for (const id of selectedIds) {
+      try { await networksApi.remove(id); } catch (e) {}
+    }
+    setSelectedIds([]);
+    onRefresh();
+  };
+
   return (
+
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -81,13 +126,7 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-          <button
-            onClick={onRefresh}
-            className="p-2 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl"
-            title="Refresh networks"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+          <RefreshButton onRefresh={onRefresh} title="Refresh networks" />
 
           {isOperator && (
             <button
@@ -118,67 +157,102 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
         </div>
       </div>
 
+      
+      {selectedIds.length > 0 && isOperator && (
+        <div className="p-3 bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-between transition-colors shadow-sm mb-4">
+          <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {selectedIds.length} Selected
+          </span>
+          <button onClick={handleBatchDelete} className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-xs font-semibold transition-colors">
+            Delete Selected
+          </button>
+        </div>
+      )}
       <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm dark:shadow-xl transition-colors">
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px] border-b border-zinc-200 dark:border-zinc-800">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-xs border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <th className="py-3 px-4">Network Name</th>
-                <th className="py-3 px-4">Driver</th>
-                <th className="py-3 px-4">Subnet / Gateway</th>
-                <th className="py-3 px-4">Connected Containers</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-3 w-8 sm:w-10 text-center shrink-0">
+                  <input
+                    type="checkbox"
+                    disabled={deletableNetworks.length === 0}
+                    checked={selectedIds.length > 0 && selectedIds.length === deletableNetworks.length}
+                    onChange={handleSelectAll}
+                    className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </th>
+                <th className="py-3.5 px-4 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('Name')}>
+                  Network Name {sortConfig.key === 'Name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3.5 px-4 cursor-pointer hover:text-zinc-900 dark:hover:text-white select-none" onClick={() => handleSort('Driver')}>
+                  Driver {sortConfig.key === 'Driver' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="py-3.5 px-4">Subnet / Gateway</th>
+                <th className="py-3.5 px-4">Connected Containers</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60 font-mono">
-            {filtered.length === 0 ? (
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
+            {sorted.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-16 text-center text-zinc-500 font-sans">
+                <td colSpan={6} className="py-16 text-center text-zinc-500 font-sans text-sm">
                   No networks found.
                 </td>
               </tr>
             ) : (
-              filtered.map((n) => {
+              sorted.map((n) => {
                 const id = n.Id || (n as any).id;
                 const subnet = n.IPAM?.Config?.[0]?.Subnet || '-';
                 const containerCount = n.Containers ? Object.keys(n.Containers).length : 0;
+                const isDeletable = !['bridge', 'host', 'none'].includes(n.Name) && !n.isSelf;
                 return (
                   <tr key={id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3 px-4 font-bold text-zinc-900 dark:text-zinc-200">
+                    <td className="py-3 px-3 w-8 sm:w-10 text-center shrink-0">
+                      <input
+                        type="checkbox"
+                        disabled={!isDeletable}
+                        checked={selectedIds.includes(id)}
+                        onChange={() => toggleSelect(id)}
+                        className="rounded bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-zinc-900 dark:text-zinc-100 font-sans text-sm">
                       <div className="flex items-center space-x-2">
                         <span>{n.Name}</span>
                         {n.isSelf && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform Virtual Network">
-                            <ShieldCheck className="w-3 h-3" />
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 inline-flex items-center space-x-1" title="Platform Virtual Network">
+                            <ShieldCheck className="w-3.5 h-3.5" />
                             <span>Self</span>
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
-                      <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 uppercase text-[10px]">
+                    <td className="py-3.5 px-4 text-zinc-600 dark:text-zinc-400">
+                      <span className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 uppercase text-xs font-semibold font-mono text-zinc-700 dark:text-zinc-300">
                         {n.Driver}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-zinc-600 dark:text-zinc-400">{subnet}</td>
-                    <td className="py-3 px-4 text-zinc-700 dark:text-zinc-300">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-bold">{containerCount}</span>
+                    <td className="py-3.5 px-4 text-xs sm:text-sm font-mono text-zinc-700 dark:text-zinc-300">{subnet}</td>
+                    <td className="py-3.5 px-4 text-zinc-700 dark:text-zinc-300">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 font-sans">{containerCount}</span>
                         {n.Containers && containerCount > 0 && (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1.5">
                             {Object.entries(n.Containers).map(([cid, cval]) => (
                               <span
                                 key={cid}
-                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-700 dark:text-zinc-400"
+                                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-700 dark:text-zinc-300"
                               >
                                 <span>{cval.Name}</span>
                                 {isOperator && (
                                   <button
                                     onClick={() => handleDisconnect(id, cid)}
-                                    className="text-zinc-400 hover:text-red-500"
+                                    className="text-zinc-400 hover:text-red-500 transition-colors"
                                     title="Disconnect"
                                   >
-                                    <Unlink className="w-2.5 h-2.5" />
+                                    <Unlink className="w-3 h-3" />
                                   </button>
                                 )}
                               </span>
@@ -187,8 +261,8 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-2">
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5 sm:space-x-2">
                         {isOperator && (
                           <button
                             onClick={() => {
@@ -196,9 +270,9 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
                               setSelectedContainerId(containers[0]?.id || '');
                             }}
                             title="Connect Container"
-                            className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-blue-600 dark:text-blue-400"
+                            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-blue-600 dark:text-blue-400 transition-colors"
                           >
-                            <Link className="w-3.5 h-3.5" />
+                            <Link className="w-4 h-4" />
                           </button>
                         )}
                         <button
@@ -207,17 +281,17 @@ export const NetworksPage: React.FC<NetworksPageProps> = ({ networks, containers
                             setInspectNetwork(data);
                           }}
                           title="Inspect"
-                          className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                          className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-4 h-4" />
                         </button>
-                        {isOperator && !['bridge', 'host', 'none'].includes(n.Name) && !n.isSelf && (
+                        {isOperator && isDeletable && (
                           <button
                             onClick={() => handleDelete(id, n.Name)}
                             title="Delete Network"
-                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20"
+                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
